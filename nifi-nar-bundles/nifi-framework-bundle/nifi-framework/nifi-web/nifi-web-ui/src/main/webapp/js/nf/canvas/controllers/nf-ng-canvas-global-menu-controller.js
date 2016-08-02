@@ -141,7 +141,7 @@ nf.ng.Canvas.GlobalMenuCtrl = function (serviceProvider) {
              * @returns {*|boolean}
              */
             visible: function () {
-                return nf.Canvas.isConnectedToCluster();
+                return nf.Canvas.isClustered();
             },
 
             /**

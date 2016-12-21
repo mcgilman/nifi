@@ -16,26 +16,38 @@
  */
 package org.apache.nifi.io.socket;
 
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.security.KeyManagementException;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
-import java.security.UnrecoverableKeyException;
-import java.security.cert.CertificateException;
+import org.apache.nifi.security.util.KeyStoreUtils;
+import org.apache.nifi.util.NiFiProperties;
+import org.apache.nifi.util.file.FileUtils;
 
+import javax.net.ssl.CertPathTrustManagerParameters;
 import javax.net.ssl.KeyManager;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
-
-import org.apache.nifi.security.util.KeyStoreUtils;
-import org.apache.nifi.util.NiFiProperties;
-import org.apache.nifi.util.file.FileUtils;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.security.InvalidAlgorithmParameterException;
+import java.security.KeyManagementException;
+import java.security.KeyStore;
+import java.security.KeyStoreException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.Security;
+import java.security.UnrecoverableKeyException;
+import java.security.cert.CertPath;
+import java.security.cert.CertPathValidator;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.PKIXBuilderParameters;
+import java.security.cert.PKIXCertPathValidatorResult;
+import java.security.cert.PKIXParameters;
+import java.security.cert.X509CertSelector;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.List;
 
 public class SSLContextFactory {
 
@@ -49,7 +61,9 @@ public class SSLContextFactory {
     private final KeyManager[] keyManagers;
     private final TrustManager[] trustManagers;
 
-    public SSLContextFactory(final NiFiProperties properties) throws NoSuchAlgorithmException, CertificateException, FileNotFoundException, IOException, KeyStoreException, UnrecoverableKeyException {
+    public SSLContextFactory(final NiFiProperties properties)
+            throws NoSuchAlgorithmException, CertificateException, FileNotFoundException, IOException, KeyStoreException, UnrecoverableKeyException, InvalidAlgorithmParameterException {
+
         keystore = properties.getProperty(NiFiProperties.SECURITY_KEYSTORE);
         keystorePass = getPass(properties.getProperty(NiFiProperties.SECURITY_KEYSTORE_PASSWD));
         keystoreType = properties.getProperty(NiFiProperties.SECURITY_KEYSTORE_TYPE);
@@ -77,8 +91,25 @@ public class SSLContextFactory {
         } finally {
             FileUtils.closeQuietly(trustStoreStream);
         }
-        final TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-        trustManagerFactory.init(trustStore);
+
+
+        // -------------
+
+        PKIXBuilderParameters pbParams = new PKIXBuilderParameters(trustStore, new X509CertSelector());
+
+        // Make sure revocation checking is enabled
+        pbParams.setRevocationEnabled(true);
+
+        // Enable On-Line Certificate Status Protocol (OCSP) support
+        Security.setProperty("ocsp.enable","true");
+
+        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        trustManagerFactory.init(new CertPathTrustManagerParameters(pbParams));
+
+        // --------------
+
+//        final TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+//        trustManagerFactory.init(trustStore);
 
         keyManagers = keyManagerFactory.getKeyManagers();
         trustManagers = trustManagerFactory.getTrustManagers();
@@ -86,6 +117,44 @@ public class SSLContextFactory {
 
     private static char[] getPass(final String password) {
         return password == null ? null : password.toCharArray();
+    }
+
+    public static void main(final String[] args) throws Exception {
+        String certFile = "/Users/mgilman/certificates/revoked.gilman.pem";
+        String cacertsFile = "/Users/mgilman/certificates/truststore.gilman.jks";
+        String cacertsPassword = "montana-to-rice";
+        String responderUrl = "";
+
+        // set security options to ocsp validation
+        Security.setProperty("ocsp.enable", "true");
+//        System.setProperty("com.sun.security.enableCRLDP", "false");
+//        Security.setProperty("ocsp.responderURL", responderUrl);
+//        if (args.length == 5) {
+//            Security.setProperty("ocsp.responderCertSubjectName", args[4]);
+//        }
+
+        // read the certificate from the file
+        System.out.println("Loading certificate...");
+        FileInputStream is = new FileInputStream(certFile);
+        CertificateFactory cf = CertificateFactory.getInstance("X.509");
+        X509Certificate cert = (X509Certificate) cf.generateCertificate(is);
+
+        // read the cacerts keystore to check signature
+        System.out.println("Loading cacerts...");
+        KeyStore cacerts = KeyStore.getInstance(KeyStore.getDefaultType());
+        cacerts.load(new FileInputStream(cacertsFile), cacertsPassword.toCharArray());
+
+        // check the certpath with PKIX
+        List<X509Certificate> certs = new ArrayList<X509Certificate>();
+        certs.add(cert);
+        CertPath certPath = cf.generateCertPath(certs);
+        CertPathValidator cpv = CertPathValidator.getInstance("PKIX");
+        PKIXParameters params = new PKIXParameters(cacerts);
+
+        //params.setRevocationEnabled(false);
+        System.out.println("Performing PKIX validation...");
+        PKIXCertPathValidatorResult cpvResult = (PKIXCertPathValidatorResult) cpv.validate(certPath, params);
+        System.out.println("Result: OK");
     }
 
     /**

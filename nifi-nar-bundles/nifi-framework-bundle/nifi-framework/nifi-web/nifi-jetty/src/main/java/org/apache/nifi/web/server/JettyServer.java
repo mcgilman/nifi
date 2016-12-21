@@ -626,6 +626,9 @@ public class JettyServer implements NiFiServer {
             contextFactory.setWantClientAuth(true);
         }
 
+        contextFactory.setValidatePeerCerts(true);
+        contextFactory.setEnableOCSP(true);
+
         /* below code sets JSSE system properties when values are provided */
         // keystore properties
         if (StringUtils.isNotBlank(props.getProperty(NiFiProperties.SECURITY_KEYSTORE))) {

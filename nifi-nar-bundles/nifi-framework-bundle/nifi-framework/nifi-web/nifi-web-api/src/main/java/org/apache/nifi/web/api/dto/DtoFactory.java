@@ -1552,6 +1552,8 @@ public final class DtoFactory {
         if (group.getAuthorizationIssue() != null) {
             dto.setAuthorizationIssues(Arrays.asList(group.getAuthorizationIssue()));
         }
+        // TODO - set validation errors
+        // TODO - set local network interface
 
         dto.setActiveRemoteInputPortCount(activeRemoteInputPortCount);
         dto.setInactiveRemoteInputPortCount(inactiveRemoteInputPortCount);

@@ -113,7 +113,7 @@ public class NiFiClientUtil {
                     if (status == 404) {
                         logger.warn("This node is not attached to a cluster. Please connect to a node that is attached to the cluster for information")
                     } else {
-                        logger.warn("Failed with HTTP error code: {}, message: {}", status, response.statusInfo.reasonPhrase)
+                        logger.warn("Failed with HTTP error code: {}, message: {}", status, response.getEntity(String.class))
                     }
                 } else if (status == 200) {
                     return response.getEntity(ClusterEntity.class)

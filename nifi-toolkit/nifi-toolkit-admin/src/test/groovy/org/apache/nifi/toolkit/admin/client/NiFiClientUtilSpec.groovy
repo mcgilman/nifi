@@ -127,8 +127,7 @@ class NiFiClientUtilSpec extends Specification{
         1 * resource.type(_) >> builder
         1 * builder.get(_) >> response
         1 * response.getStatus() >> 500
-        1 * response.getStatusInfo() >> statusType
-        1 * statusType.getReasonPhrase() >> "Only a node connected to a cluster can process the request."
+        1 * response.getEntity(String.class) >> "Only a node connected to a cluster can process the request."
         def e = thrown(RuntimeException)
         e.message == "Unable to obtain cluster information"
 

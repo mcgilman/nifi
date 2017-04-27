@@ -110,7 +110,7 @@ public class NodeManagerTool extends AbstractAdminTool {
         }
 
         if(response.status != 200){
-            throw new RuntimeException("Failed with HTTP error code " + response.status + " with reason: " +response.statusInfo.reasonPhrase)
+            throw new RuntimeException("Failed with HTTP error code " + response.status + " with reason: " +response.getEntity(String.class))
         }else{
             response.getEntity(NodeEntity.class)
         }
@@ -131,7 +131,7 @@ public class NodeManagerTool extends AbstractAdminTool {
         }
 
         if(response.status != 200){
-            throw new RuntimeException("Failed with HTTP error code " + response.status + " with reason: " +response.statusInfo.reasonPhrase)
+            throw new RuntimeException("Failed with HTTP error code " + response.status + " with reason: " +response.getEntity(String.class))
         }
     }
 

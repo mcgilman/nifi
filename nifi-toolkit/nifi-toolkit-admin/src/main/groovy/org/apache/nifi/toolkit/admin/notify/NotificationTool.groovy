@@ -122,7 +122,7 @@ public class NotificationTool extends AbstractAdminTool {
             if(status == 404){
                 throw new RuntimeException("The notification feature is not supported by each node in the cluster")
             }else{
-                throw new RuntimeException("Failed with HTTP error code " + status + " with reason: " +response.statusInfo.reasonPhrase)
+                throw new RuntimeException("Failed with HTTP error code " + status + " with reason: " +response.getEntity(String.class))
             }
         }
 

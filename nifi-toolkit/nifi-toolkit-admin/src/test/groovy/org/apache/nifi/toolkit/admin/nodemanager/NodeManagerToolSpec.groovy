@@ -229,8 +229,7 @@ class NodeManagerToolSpec extends Specification{
         1 * resource.type(_) >> builder
         1 * builder.delete(_) >> response
         2 * response.getStatus() >> 403
-        1 * response.statusInfo >> statusType
-        1 * statusType.reasonPhrase >> "Unauthorized User"
+        1 * response.getEntity(String.class) >> "Unauthorized User"
         def e = thrown(RuntimeException)
         e.message == "Failed with HTTP error code 403 with reason: Unauthorized User"
 
@@ -307,8 +306,7 @@ class NodeManagerToolSpec extends Specification{
         1 * resource.type(_) >> builder
         1 * builder.put(_,_) >> response
         2 * response.getStatus() >> 403
-        1 * response.statusInfo >> statusType
-        1 * statusType.reasonPhrase >> "Unauthorized User"
+        1 * response.getEntity(String.class) >> "Unauthorized User"
         def e = thrown(RuntimeException)
         e.message == "Failed with HTTP error code 403 with reason: Unauthorized User"
 

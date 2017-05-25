@@ -1152,7 +1152,6 @@ public class StandardFlowFileQueue implements FlowFileQueue {
                                 }
 
                                 swapContents = swapManager.swapIn(swapLocation, StandardFlowFileQueue.this);
-                                droppedSize = drop(swapContents.getFlowFiles(), requestor);
                             } catch (final IncompleteSwapFileException isfe) {
                                 swapContents = isfe.getPartialContents();
                                 final String warnMsg = "Failed to swap in FlowFiles from Swap File " + swapLocation + " because the file was corrupt. "
@@ -1176,6 +1175,16 @@ public class StandardFlowFileQueue implements FlowFileQueue {
                                     activeQueue.addAll(swapContents.getFlowFiles()); // ensure that we don't lose the FlowFiles from our queue.
                                 }
 
+                                return;
+                            }
+
+                            try {
+                                droppedSize = drop(swapContents.getFlowFiles(), requestor);
+                            } catch (final IOException ioe) {
+                                logger.error("Failed to drop the FlowFiles from {} due to {}", swapLocation, ioe.toString());
+                                logger.error("", ioe);
+
+                                dropRequest.setState(DropFlowFileState.FAILURE, "Failed to drop FlowFiles due to " + ioe.toString());
                                 return;
                             }
 

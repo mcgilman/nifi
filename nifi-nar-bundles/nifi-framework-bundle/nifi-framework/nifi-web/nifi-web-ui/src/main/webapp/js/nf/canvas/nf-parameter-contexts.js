@@ -191,7 +191,7 @@
 
         $('#process-group-parameter').text('');
         $('#parameter-process-group-id').text('').removeData('revision');
-        $('#affected-components-context').removeClass('unset').text('');
+        $('#parameter-affected-components-context').removeClass('unset').text('');
 
         var parameterGrid = $('#parameter-table').data('gridInstance');
         var parameterData = parameterGrid.getData();
@@ -755,7 +755,7 @@
         var parameterNames = parameterContextEntity.component.parameters.map(function (parameterEntity) {
             return parameterEntity.parameter.name;
         });
-        $('#affected-components-context').removeClass('unset').text(parameterNames.join(', '));
+        $('#parameter-affected-components-context').removeClass('unset').text(parameterNames.join(', '));
 
         return $.Deferred(function (deferred) {
             // updates the button model to show the close button
@@ -1036,7 +1036,7 @@
                 $('<li class="affected-component-container"><span class="unset">None</span></li>').appendTo(unauthorizedComponentsContainer);
 
                 // update the selection context
-                $('#affected-components-context').addClass('unset').text('None');
+                $('#parameter-affected-components-context').addClass('unset').text('None');
             } else {
                 // select the desired row
                 parameterGrid.setSelectedRows([parameterIndex]);
@@ -1171,7 +1171,7 @@
                     var rows = parameterData.getItems();
                     if (rows.length === 0) {
                         // clear usages
-                        $('#affected-components-context').removeClass('unset').text('');
+                        $('#parameter-affected-components-context').removeClass('unset').text('');
 
                         var affectedProcessorContainer = $('#parameter-context-affected-processors');
                         nfCommon.cleanUpTooltips(affectedProcessorContainer, 'div.referencing-component-state');
@@ -1284,7 +1284,7 @@
                     // only populate affected components if this parameter is different than the last selected
                     if (lastSelectedId === null || lastSelectedId !== parameter.id) {
                         // update the details for this parameter
-                        $('#affected-components-context').removeClass('unset').text(parameter.name);
+                        $('#parameter-affected-components-context').removeClass('unset').text(parameter.name);
                         populateAffectedComponents(parameter.affectedComponents);
 
                         // update the last selected id
@@ -1502,7 +1502,7 @@
                 markup += '<div title="Edit" class="pointer edit-parameter-context fa fa-pencil"></div>';
             }
 
-            if (canRead && canWrite && nfCommon.canModifyController()) {
+            if (canRead && canWrite && nfCommon.canModifyParameterContexts()) {
                 markup += '<div title="Remove" class="pointer delete-parameter-context fa fa-trash"></div>';
             }
 
@@ -1785,6 +1785,10 @@
          * Shows the parameter context dialog.
          */
         showParameterContexts: function () {
+            // conditionally allow creation of new parameter contexts
+            $('#new-parameter-context').prop('disabled', !nfCommon.canModifyParameterContexts());
+
+            // load the parameter contexts
             return loadParameterContexts().done(showParameterContexts);
         },
 

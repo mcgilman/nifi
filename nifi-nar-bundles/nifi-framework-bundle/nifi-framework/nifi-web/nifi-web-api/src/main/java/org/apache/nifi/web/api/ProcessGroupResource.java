@@ -2146,7 +2146,9 @@ public class ProcessGroupResource extends FlowUpdateResource<ProcessGroupImportE
                     value = "The process group id.",
                     required = true
             )
-            @PathParam("id") final String groupId) {
+            @PathParam("id") final String groupId,
+            @ApiParam("Whether or not to include process groups from descendant process groups")
+            @QueryParam("includeDescendantGroups") @DefaultValue("false") boolean includeDescendantGroups) {
 
         if (isReplicateRequest()) {
             return replicate(HttpMethod.GET);
@@ -2159,7 +2161,7 @@ public class ProcessGroupResource extends FlowUpdateResource<ProcessGroupImportE
         });
 
         // get the process groups
-        final Set<ProcessGroupEntity> entities = serviceFacade.getProcessGroups(groupId);
+        final Set<ProcessGroupEntity> entities = serviceFacade.getProcessGroups(groupId, includeDescendantGroups);
 
         // always prune the contents
         for (final ProcessGroupEntity entity : entities) {

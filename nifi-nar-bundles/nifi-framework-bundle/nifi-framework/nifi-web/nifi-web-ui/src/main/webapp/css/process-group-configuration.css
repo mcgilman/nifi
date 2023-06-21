@@ -81,6 +81,10 @@
     vertical-align: middle;
 }
 
+#process-group-parameter-context-combo {
+    width: 328px;
+}
+
 #process-group-flowfile-concurrency-combo {
     width: 328px;
 }
@@ -115,18 +119,4 @@
 
 #upload-process-group-link {
     float: right;
-}
-
-/* Parameter Context */
-#process-group-parameter-context-combo {
-    width: 328px;
-}
-
-#parameter-contexts-recursive-container {
-    padding-top: 5px;
-}
-
-#process-group-parameter-context-configuration-save {
-    position: absolute;
-    bottom: 29px;
 }

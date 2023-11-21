@@ -170,6 +170,8 @@ export interface ParameterContextReference {
 
 export interface AffectedComponentEntity {
     permissions: Permissions;
+    id: string;
+    revision: Revision;
     bulletins: BulletinEntity[];
     component: AffectedComponent;
     processGroup: ProcessGroupName;
@@ -288,8 +290,8 @@ export interface PropertyDescriptor {
     name: string;
     displayName: string;
     description: string;
-    defaultValue: string;
-    allowableValues: AllowableValueEntity[];
+    defaultValue?: string;
+    allowableValues?: AllowableValueEntity[];
     required: boolean;
     sensitive: boolean;
     dynamic: boolean;

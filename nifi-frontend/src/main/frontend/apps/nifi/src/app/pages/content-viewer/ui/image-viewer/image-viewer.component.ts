@@ -15,20 +15,16 @@
  * limitations under the License.
  */
 
-import { Action, combineReducers, createFeatureSelector } from '@ngrx/store';
-import { Access, accessFeatureKey } from './access';
-import { accessReducer } from './access/access.reducer';
+import { Component, Input } from '@angular/core';
+import { ContentViewerService } from '../../service/content-viewer.service';
 
-export const loginFeatureKey = 'login';
-
-export interface LoginState {
-    [accessFeatureKey]: Access;
+@Component({
+    selector: 'image-viewer',
+    standalone: true,
+    templateUrl: './image-viewer.component.html',
+    imports: [],
+    styleUrls: ['./image-viewer.component.scss']
+})
+export class ImageViewer {
+    @Input() ref: string | null = null;
 }
-
-export function reducers(state: LoginState | undefined, action: Action) {
-    return combineReducers({
-        [accessFeatureKey]: accessReducer
-    })(state, action);
-}
-
-export const selectLoginState = createFeatureSelector<LoginState>(loginFeatureKey);

@@ -16,19 +16,19 @@
  */
 
 import { Action, combineReducers, createFeatureSelector } from '@ngrx/store';
-import { Access, accessFeatureKey } from './access';
-import { accessReducer } from './access/access.reducer';
+import { viewerOptionsFeatureKey, ViewerOptionsState } from './viewer-options';
+import { viewerOptionsReducer } from './viewer-options/viewer-options.reducer';
 
-export const loginFeatureKey = 'login';
+export const contentViewersFeatureKey = 'contentViewers';
 
-export interface LoginState {
-    [accessFeatureKey]: Access;
+export interface ContentViewersState {
+    [viewerOptionsFeatureKey]: ViewerOptionsState;
 }
 
-export function reducers(state: LoginState | undefined, action: Action) {
+export function reducers(state: ContentViewersState | undefined, action: Action) {
     return combineReducers({
-        [accessFeatureKey]: accessReducer
+        [viewerOptionsFeatureKey]: viewerOptionsReducer
     })(state, action);
 }
 
-export const selectLoginState = createFeatureSelector<LoginState>(loginFeatureKey);
+export const selectContentViewersState = createFeatureSelector<ContentViewersState>(contentViewersFeatureKey);

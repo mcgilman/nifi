@@ -15,20 +15,25 @@
  * limitations under the License.
  */
 
-import { Action, combineReducers, createFeatureSelector } from '@ngrx/store';
-import { Access, accessFeatureKey } from './access';
-import { accessReducer } from './access/access.reducer';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-export const loginFeatureKey = 'login';
+import { ImageViewer } from './image-viewer.component';
 
-export interface LoginState {
-    [accessFeatureKey]: Access;
-}
+describe('ImageViewer', () => {
+    let component: ImageViewer;
+    let fixture: ComponentFixture<ImageViewer>;
 
-export function reducers(state: LoginState | undefined, action: Action) {
-    return combineReducers({
-        [accessFeatureKey]: accessReducer
-    })(state, action);
-}
+    beforeEach(() => {
+        TestBed.configureTestingModule({
+            imports: [ImageViewer]
+        });
 
-export const selectLoginState = createFeatureSelector<LoginState>(loginFeatureKey);
+        fixture = TestBed.createComponent(ImageViewer);
+        component = fixture.componentInstance;
+        fixture.detectChanges();
+    });
+
+    it('should create', () => {
+        expect(component).toBeTruthy();
+    });
+});

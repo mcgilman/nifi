@@ -26,6 +26,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.ServletContext;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.ws.rs.core.Context;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.nifi.authorization.Authorizer;
 import org.apache.nifi.authorization.RequestAction;
@@ -50,6 +53,7 @@ import org.apache.nifi.groups.ProcessGroup;
 import org.apache.nifi.nar.NarClassLoadersHolder;
 import org.apache.nifi.registry.client.NiFiRegistryException;
 import org.apache.nifi.registry.flow.FlowVersionLocation;
+import org.apache.nifi.ui.extension.contentviewer.ContentViewer;
 import org.apache.nifi.util.NiFiProperties;
 import org.apache.nifi.web.IllegalClusterResourceRequestException;
 import org.apache.nifi.web.NiFiServiceFacade;
@@ -62,10 +66,12 @@ import org.apache.nifi.web.api.dto.BulletinQueryDTO;
 import org.apache.nifi.web.api.dto.ClusterDTO;
 import org.apache.nifi.web.api.dto.ClusterSummaryDTO;
 import org.apache.nifi.web.api.dto.ComponentDifferenceDTO;
+import org.apache.nifi.web.api.dto.ContentViewerDTO;
 import org.apache.nifi.web.api.dto.DifferenceDTO;
 import org.apache.nifi.web.api.dto.NodeDTO;
 import org.apache.nifi.web.api.dto.ProcessGroupDTO;
 import org.apache.nifi.web.api.dto.RevisionDTO;
+import org.apache.nifi.web.api.dto.SupportedMimeTypesDTO;
 import org.apache.nifi.web.api.dto.action.HistoryDTO;
 import org.apache.nifi.web.api.dto.action.HistoryQueryDTO;
 import org.apache.nifi.web.api.dto.flow.FlowDTO;
@@ -83,6 +89,7 @@ import org.apache.nifi.web.api.entity.ClusterSummaryEntity;
 import org.apache.nifi.web.api.entity.ComponentHistoryEntity;
 import org.apache.nifi.web.api.entity.ConnectionStatisticsEntity;
 import org.apache.nifi.web.api.entity.ConnectionStatusEntity;
+import org.apache.nifi.web.api.entity.ContentViewerEntity;
 import org.apache.nifi.web.api.entity.ControllerBulletinsEntity;
 import org.apache.nifi.web.api.entity.ControllerServiceEntity;
 import org.apache.nifi.web.api.entity.ControllerServiceTypesEntity;
@@ -148,10 +155,12 @@ import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.StreamingOutput;
+import org.apache.nifi.web.servlet.shared.RequestUriBuilder;
 import org.apache.nifi.web.util.PaginationHelper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 
+import java.net.URI;
 import java.text.Collator;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
@@ -202,6 +211,9 @@ public class FlowResource extends ApplicationResource {
     private ControllerServiceResource controllerServiceResource;
     private ReportingTaskResource reportingTaskResource;
     private ParameterProviderResource parameterProviderResource;
+
+    @Context
+    private ServletContext servletContext;
 
     public FlowResource() {
         super();
@@ -317,6 +329,73 @@ public class FlowResource extends ApplicationResource {
         }
 
         final FlowConfigurationEntity entity = serviceFacade.getFlowConfiguration();
+        return generateOkResponse(entity).build();
+    }
+
+    /**
+     * Retrieves the registered content viewers.
+     *
+     * @return A contentViewerEntity.
+     */
+    @GET
+    @Consumes(MediaType.WILDCARD)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Path("content-viewers")
+    @Operation(
+            summary = "Retrieves the registered content viewers",
+            responses = @ApiResponse(content = @Content(schema = @Schema(implementation = ContentViewerEntity.class))),
+            security = {
+                    @SecurityRequirement(name = "Read - /flow")
+            }
+    )
+    @ApiResponses(
+            value = {
+                    @ApiResponse(responseCode = "400", description = "NiFi was unable to complete the request because it was invalid. The request should not be retried without modification."),
+                    @ApiResponse(responseCode = "401", description = "Client could not be authenticated."),
+                    @ApiResponse(responseCode = "403", description = "Client is not authorized to make this request."),
+                    @ApiResponse(responseCode = "409", description = "The request was valid but NiFi was not in the appropriate state to process it.")
+            }
+    )
+    public Response getContentViewers(@Context final HttpServletRequest httpServletRequest) {
+        authorizeFlow();
+
+        final Map<String, ContentViewer> contentViewers = (Map<String, ContentViewer>) servletContext.getAttribute("content-viewers");
+
+        final List<ContentViewerDTO> dtos = new ArrayList<>();
+        contentViewers.forEach((displayName, contentViewer) -> {
+            final ContentViewerDTO dto = new ContentViewerDTO();
+            dto.setDisplayName(displayName);
+
+            final List<SupportedMimeTypesDTO> supportedMimeTypes = contentViewer.getSupportedMimeTypes().stream().map((supportedMimeType -> {
+                final SupportedMimeTypesDTO mimeTypesDto = new SupportedMimeTypesDTO();
+                mimeTypesDto.setDisplayName(supportedMimeType.getDisplayName());
+                mimeTypesDto.setMimeTypes(supportedMimeType.getMimeTypes());
+                return mimeTypesDto;
+            })).collect(Collectors.toList());
+            dto.setSupportedMimeTypes(supportedMimeTypes);
+
+            final URI contentViewerUri = RequestUriBuilder.fromHttpServletRequest(httpServletRequest).path(contentViewer.getContextPath()).build();
+            dto.setUri(contentViewerUri.toString());
+
+            dtos.add(dto);
+        });
+
+        final ContentViewerDTO hexViewerDto = new ContentViewerDTO();
+        hexViewerDto.setDisplayName("Standard Hex Viewer");
+
+        final SupportedMimeTypesDTO hexMimeTypeDto = new SupportedMimeTypesDTO();
+        hexMimeTypeDto.setDisplayName("hex");
+        hexMimeTypeDto.setMimeTypes(List.of("*/*"));
+        hexViewerDto.setSupportedMimeTypes(List.of(hexMimeTypeDto));
+
+        final URI hexViewerUri = RequestUriBuilder.fromHttpServletRequest(httpServletRequest).path("/nifi").fragment("/content-viewer/hex").build();
+        hexViewerDto.setUri(hexViewerUri.toString());
+
+        dtos.add(hexViewerDto);
+
+        final ContentViewerEntity entity = new ContentViewerEntity();
+        entity.setContentViewers(dtos);
+
         return generateOkResponse(entity).build();
     }
 
@@ -1782,7 +1861,7 @@ public class FlowResource extends ApplicationResource {
                     @ApiResponse(responseCode = "409", description = "The request was valid but NiFi was not in the appropriate state to process it.")
             }
     )
-    public Response getAboutInfo() {
+    public Response getAboutInfo(@Context final HttpServletRequest httpServletRequest) {
         authorizeFlow();
 
         // create the about dto
@@ -1793,7 +1872,14 @@ public class FlowResource extends ApplicationResource {
 
         // get the content viewer url
         final NiFiProperties properties = getProperties();
-        aboutDTO.setContentViewerUrl(properties.getProperty(NiFiProperties.CONTENT_VIEWER_URL));
+        final String contentViewerUrl = properties.getProperty(NiFiProperties.CONTENT_VIEWER_URL);
+
+        if (StringUtils.isBlank(contentViewerUrl)) {
+            final URI contentViewerUri = RequestUriBuilder.fromHttpServletRequest(httpServletRequest).path("/nifi").fragment("/content-viewer").build();
+            aboutDTO.setContentViewerUrl(contentViewerUri.toString());
+        } else {
+            aboutDTO.setContentViewerUrl(contentViewerUrl);
+        }
 
         final Bundle frameworkBundle = NarClassLoadersHolder.getInstance().getFrameworkBundle();
         if (frameworkBundle != null) {

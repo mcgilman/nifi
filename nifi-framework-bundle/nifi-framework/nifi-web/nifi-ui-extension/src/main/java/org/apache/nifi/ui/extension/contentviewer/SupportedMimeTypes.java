@@ -14,21 +14,35 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package org.apache.nifi.ui.extension.contentviewer;
 
-import { Action, combineReducers, createFeatureSelector } from '@ngrx/store';
-import { Access, accessFeatureKey } from './access';
-import { accessReducer } from './access/access.reducer';
+import java.util.List;
 
-export const loginFeatureKey = 'login';
+/**
+ * Information about supported mime types for a Content Viewer.
+ */
+public class SupportedMimeTypes {
 
-export interface LoginState {
-    [accessFeatureKey]: Access;
+    private final String displayName;
+    private final List<String> mimeTypes;
+
+    public SupportedMimeTypes(final String displayName, final List<String> mimeTypes) {
+        this.displayName = displayName;
+        this.mimeTypes = mimeTypes;
+    }
+
+    /**
+     * @return mime types supported by this content viewer
+     */
+    public List<String> getMimeTypes() {
+        return mimeTypes;
+    }
+
+    /**
+     * @return The context path of this UI extension
+     */
+    public String getDisplayName() {
+        return displayName;
+    }
+
 }
-
-export function reducers(state: LoginState | undefined, action: Action) {
-    return combineReducers({
-        [accessFeatureKey]: accessReducer
-    })(state, action);
-}
-
-export const selectLoginState = createFeatureSelector<LoginState>(loginFeatureKey);

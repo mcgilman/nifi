@@ -15,20 +15,15 @@
  * limitations under the License.
  */
 
-import { Action, combineReducers, createFeatureSelector } from '@ngrx/store';
-import { Access, accessFeatureKey } from './access';
-import { accessReducer } from './access/access.reducer';
+import { createAction, props } from '@ngrx/store';
+import { LoginRequest } from '../../../login/state/access';
+import { ContentViewerEntity } from './index';
 
-export const loginFeatureKey = 'login';
+export const loadContentViewerOptions = createAction('[Content Viewer Options] Load Content Viewer Options');
 
-export interface LoginState {
-    [accessFeatureKey]: Access;
-}
+export const loadContentViewerOptionsSuccess = createAction(
+    '[Content Viewer Options] Load Content Viewer Options Success',
+    props<{ response: ContentViewerEntity }>()
+);
 
-export function reducers(state: LoginState | undefined, action: Action) {
-    return combineReducers({
-        [accessFeatureKey]: accessReducer
-    })(state, action);
-}
-
-export const selectLoginState = createFeatureSelector<LoginState>(loginFeatureKey);
+export const resetContentViewerOptions = createAction('[Content Viewer Options] Reset Content Viewer Options');

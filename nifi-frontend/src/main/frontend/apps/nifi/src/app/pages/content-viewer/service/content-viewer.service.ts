@@ -15,20 +15,23 @@
  * limitations under the License.
  */
 
-import { Action, combineReducers, createFeatureSelector } from '@ngrx/store';
-import { Access, accessFeatureKey } from './access';
-import { accessReducer } from './access/access.reducer';
+import { Injectable } from '@angular/core';
+import { Observable } from 'rxjs';
+import { HttpClient } from '@angular/common/http';
 
-export const loginFeatureKey = 'login';
+@Injectable({ providedIn: 'root' })
+export class ContentViewerService {
+    private static readonly API: string = '../nifi-api';
 
-export interface LoginState {
-    [accessFeatureKey]: Access;
+    constructor(private httpClient: HttpClient) {}
+
+    getContentViewers(): Observable<any> {
+        return this.httpClient.get(`${ContentViewerService.API}/flow/content-viewers`);
+    }
+
+    getBlob(url: string): Observable<any> {
+        return this.httpClient.get(url, {
+            responseType: 'blob'
+        });
+    }
 }
-
-export function reducers(state: LoginState | undefined, action: Action) {
-    return combineReducers({
-        [accessFeatureKey]: accessReducer
-    })(state, action);
-}
-
-export const selectLoginState = createFeatureSelector<LoginState>(loginFeatureKey);

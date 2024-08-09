@@ -19,7 +19,6 @@ import { Component, SecurityContext } from '@angular/core';
 import { NiFiState } from '../../../state';
 import { Store } from '@ngrx/store';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { HttpParams } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Navigation } from '../navigation/navigation.component';
 import { selectRouteData } from '@nifi/shared';
@@ -74,14 +73,13 @@ export class AdvancedUi {
     }
 
     private getFrameSource(params: AdvancedUiParams): SafeResourceUrl | null {
-        const queryParams: string = new HttpParams()
-            .set('id', params.id)
-            .set('revision', params.revision)
-            .set('clientId', params.clientId)
-            .set('editable', params.editable)
-            .set('disconnectedNodeAcknowledged', params.disconnectedNodeAcknowledged)
-            .toString();
-        const url = `${params.url}?${queryParams}`;
+        const queryParams = new URLSearchParams();
+        queryParams.set('id', params.id);
+        queryParams.set('revision', String(params.revision));
+        queryParams.set('clientId', String(params.clientId));
+        queryParams.set('editable', String(params.editable));
+        queryParams.set('disconnectedNodeAcknowledged', String(params.disconnectedNodeAcknowledged));
+        const url = `${params.url}?${queryParams.toString()}`;
 
         const sanitizedUrl = this.domSanitizer.sanitize(SecurityContext.URL, url);
 

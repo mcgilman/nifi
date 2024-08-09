@@ -15,20 +15,14 @@
  * limitations under the License.
  */
 
-import { Action, combineReducers, createFeatureSelector } from '@ngrx/store';
-import { Access, accessFeatureKey } from './access';
-import { accessReducer } from './access/access.reducer';
+import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+import { ContentViewerComponent } from './content-viewer.component';
 
-export const loginFeatureKey = 'login';
+const routes: Routes = [{ path: '', component: ContentViewerComponent }];
 
-export interface LoginState {
-    [accessFeatureKey]: Access;
-}
-
-export function reducers(state: LoginState | undefined, action: Action) {
-    return combineReducers({
-        [accessFeatureKey]: accessReducer
-    })(state, action);
-}
-
-export const selectLoginState = createFeatureSelector<LoginState>(loginFeatureKey);
+@NgModule({
+    imports: [RouterModule.forChild(routes)],
+    exports: [RouterModule]
+})
+export class ContentViewerRoutingModule {}

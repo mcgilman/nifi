@@ -14,21 +14,3 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-import { Action, combineReducers, createFeatureSelector } from '@ngrx/store';
-import { Access, accessFeatureKey } from './access';
-import { accessReducer } from './access/access.reducer';
-
-export const loginFeatureKey = 'login';
-
-export interface LoginState {
-    [accessFeatureKey]: Access;
-}
-
-export function reducers(state: LoginState | undefined, action: Action) {
-    return combineReducers({
-        [accessFeatureKey]: accessReducer
-    })(state, action);
-}
-
-export const selectLoginState = createFeatureSelector<LoginState>(loginFeatureKey);

@@ -65,7 +65,7 @@ export class QueueService {
     }
 
     downloadContent(request: DownloadFlowFileContentRequest): void {
-        let dataUri = `${this.nifiCommon.stripProtocol(request.uri)}/content`;
+        let dataUri = `${request.uri}/content`;
 
         const queryParameters: any = {};
 
@@ -83,7 +83,7 @@ export class QueueService {
 
     viewContent(request: ViewFlowFileContentRequest, contentViewerUrl: string): void {
         // build the uri to the data
-        let dataUri = `${this.nifiCommon.stripProtocol(request.uri)}/content`;
+        let dataUri = `${request.uri}/content`;
 
         const dataUriParameters: any = {};
 
@@ -108,9 +108,12 @@ export class QueueService {
         }
 
         const contentViewerParameters: any = {
-            mode: 'Formatted',
             ref: dataUri
         };
+
+        if (request.mimeType) {
+            contentViewerParameters['mimeType'] = request.mimeType;
+        }
 
         // open the content viewer
         const contentViewerQuery: string = new URLSearchParams(contentViewerParameters).toString();

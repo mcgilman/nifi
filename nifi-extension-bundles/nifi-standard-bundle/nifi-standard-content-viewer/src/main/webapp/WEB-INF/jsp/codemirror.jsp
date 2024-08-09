@@ -15,36 +15,47 @@
   limitations under the License.
 --%>
 <%@ page contentType="text/html" pageEncoding="UTF-8" session="false" %>
-<link rel="stylesheet" href="../${project.build.finalName}/js/codemirror/lib/codemirror.css" type="text/css" />
-<link rel="stylesheet" href="../${project.build.finalName}/js/codemirror/addon/fold/foldgutter.css" type="text/css" />
-<script type="text/javascript" src="../${project.build.finalName}/js/codemirror/lib/codemirror-compressed.js"></script>
-<script type="text/javascript" src="../${project.build.finalName}/assets/jquery/dist/jquery.min.js"></script>
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+        <link rel="shortcut icon" href="images/nifi16.ico"/>
+        <title>NiFi</title>
+        <link rel="stylesheet" href="../${project.build.finalName}/js/codemirror/lib/codemirror.css" type="text/css" />
+        <link rel="stylesheet" href="../${project.build.finalName}/js/codemirror/addon/fold/foldgutter.css" type="text/css" />
+        <script type="text/javascript" src="../${project.build.finalName}/js/codemirror/lib/codemirror-compressed.js"></script>
+        <script type="text/javascript" src="../${project.build.finalName}/assets/jquery/dist/jquery.min.js"></script>
+    </head>
+    <body>
+        <div>
+            <textarea id="codemirror-content"><%= request.getAttribute("content") == null ? "" : org.apache.nifi.util.EscapeUtils.escapeHtml(request.getAttribute("content").toString()) %></textarea>
+            <span id="codemirror-mode" style="display: none;"><%= org.apache.nifi.util.EscapeUtils.escapeHtml(request.getAttribute("mode").toString()) %></span>
 
-<textarea id="codemirror-content"><%= request.getAttribute("content") == null ? "" : org.apache.nifi.util.EscapeUtils.escapeHtml(request.getAttribute("content").toString()) %></textarea>
-<span id="codemirror-mode" style="display: none;"><%= org.apache.nifi.util.EscapeUtils.escapeHtml(request.getAttribute("mode").toString()) %></span> 
+            <script type="text/javascript">
+                $(document).ready(function() {
+                    var mode = $('#codemirror-mode').text();
 
-<script type="text/javascript">
-    $(document).ready(function() {
-        var mode = $('#codemirror-mode').text();
-        
-        var field = document.getElementById('codemirror-content');
-        var editor = CodeMirror.fromTextArea(field, {
-            mode: mode,
-            lineNumbers: true,
-            matchBrackets: true,
-            foldGutter: true,
-            gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
-            readOnly: true
-        });
-        
-        var setEditorSize = function() {
-            editor.setSize($(window).width() - 150, $(window).height() - 150);
-        };
-        
-        // reset the editor size when the window changes
-        $(window).resize(setEditorSize);
-        
-        // initialize the editor size
-        setEditorSize();
-    });
-</script>
+                    var field = document.getElementById('codemirror-content');
+                    var editor = CodeMirror.fromTextArea(field, {
+                        mode: mode,
+                        lineNumbers: true,
+                        matchBrackets: true,
+                        foldGutter: true,
+                        gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
+                        readOnly: true
+                    });
+
+                    var setEditorSize = function() {
+                        editor.setSize($(window).width() - 150, $(window).height() - 150);
+                    };
+
+                    // reset the editor size when the window changes
+                    $(window).resize(setEditorSize);
+
+                    // initialize the editor size
+                    setEditorSize();
+                });
+            </script>
+        </div>
+    </body>
+</html>

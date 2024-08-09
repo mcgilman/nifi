@@ -19,7 +19,6 @@ import { Component, OnDestroy, SecurityContext } from '@angular/core';
 import { NiFiState } from '../../../state';
 import { Store } from '@ngrx/store';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { HttpParams } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { selectDocumentationParameters } from '../../../state/documentation/documentation.selectors';
 import { DocumentationParameters } from '../../../state/documentation';
@@ -50,7 +49,7 @@ export class Documentation implements OnDestroy {
 
         if (params) {
             if (Object.keys(params).length > 0) {
-                const queryParams: string = new HttpParams({ fromObject: params }).toString();
+                const queryParams: string = new URLSearchParams(params).toString();
                 url = `${url}?${queryParams}`;
             }
 

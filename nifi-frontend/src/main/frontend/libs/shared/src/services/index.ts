@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+export * from './editor-modes';
 export * from './nifi-common.service';
 export * from './storage.service';
 export * from './theming.service';

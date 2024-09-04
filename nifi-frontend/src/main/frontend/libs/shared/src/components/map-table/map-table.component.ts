@@ -52,7 +52,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { MatIconButton } from '@angular/material/button';
 import { MatMenu, MatMenuItem, MatMenuTrigger } from '@angular/material/menu';
-import { TextEditor } from './editors/text-editor/text-editor.component';
+import { TextEditor } from '../editors/text-editor/text-editor.component';
 import { NifiTooltipDirective } from '../../directives';
 import { MapTableEntry, MapTableItem, NiFiCommon, TextTip } from '../../index';
 

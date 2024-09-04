@@ -128,7 +128,7 @@
                 [cdkConnectedOverlayOpen]="editorOpen"
                 (detach)="closeEditor()">
                 <text-editor
-                    [item]="editorItem"
+                    [value]="editorItem.entry.value"
                     [width]="editorWidth"
                     [readonly]="isDisabled"
                     (ok)="saveValue(editorItem, $event)"

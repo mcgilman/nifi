@@ -112,6 +112,7 @@ export class LabelManager {
         // label value
         label
             .append('text')
+            .attr('x', 10)
             .attr('xml:space', 'preserve')
             .attr('font-weight', 'bold')
             .attr('fill', 'black')
@@ -181,16 +182,18 @@ export class LabelManager {
             const labelPoint = label.selectAll('path.labelpoint');
             if (d.permissions.canRead) {
                 // udpate the font size
-                labelText.attr('font-size', function () {
-                    let fontSize = '12px';
+                labelText
+                    .attr('font-size', function () {
+                        let fontSize = '12px';
 
-                    // use the specified color if appropriate
-                    if (d.component.style['font-size']) {
-                        fontSize = d.component.style['font-size'];
-                    }
+                        // use the specified color if appropriate
+                        if (d.component.style['font-size']) {
+                            fontSize = d.component.style['font-size'];
+                        }
 
-                    return fontSize;
-                });
+                        return fontSize;
+                    })
+                    .attr('width', d.component.width - 10);
 
                 // remove the previous label value
                 labelText.selectAll('tspan').remove();
@@ -211,20 +214,14 @@ export class LabelManager {
                 }
 
                 // add label value
-                lines.forEach((line: string) => {
-                    labelText
-                        .append('tspan')
-                        .attr('x', '0.4em')
-                        .attr('dy', '1.2em')
-                        .text(function () {
-                            return line == '' ? ' ' : line;
-                        })
-                        .style('fill', function () {
-                            return self.canvasUtils.determineContrastColor(
-                                self.nifiCommon.substringAfterLast(color, '#')
-                            );
-                        });
-                });
+                self.canvasUtils.boundedMultilineEllipsis(labelText, d.component.height, lines, 'label-text');
+                labelText
+                    .selectAll('tspan')
+                    .style('fill', function () {
+                        return self.canvasUtils.determineContrastColor(
+                            self.nifiCommon.substringAfterLast(color, '#')
+                        );
+                    });
 
                 // -----------
                 // labelpoints

@@ -1430,7 +1430,103 @@ export class CanvasUtils {
     }
 
     /**
-     * Applies multiline ellipsis to the component in the specified seleciton. Text will
+     * Applies multiline ellipsis to the component in the specified selection. Text will
+     * wrap for the specified number of lines. The last line will be ellipsis if necessary.
+     *
+     * @param {selection} selection
+     * @param {number} height
+     * @param {string[]} lines
+     * @param {string} cacheName
+     */
+    public boundedMultilineEllipsis(selection: any, height: number, lines: string[], cacheName: string) {
+        let i = 1;
+
+        // get the appropriate position
+        const x = parseInt(selection.attr('x'), 10);
+        const width = parseInt(selection.attr('width'), 10);
+
+        let lineCountCalculated = false;
+        let lineCount = 1;
+        let lineHeight = height;
+
+        for (const fullLine of lines) {
+            const words: string[] = fullLine.split(/\s+/).reverse();
+
+            let newLine = true;
+            let line: string[] = [];
+            let tspan = selection.append('tspan').attr('x', x).attr('width', width);
+
+            // go through each word
+            let word = words.pop();
+            while (word) {
+                // add the current word
+                line.push(word);
+
+                // update the label text
+                tspan.text(line.join(' '));
+
+                if (!lineCountCalculated) {
+                    const bbox = tspan.node().getBoundingClientRect();
+                    lineHeight = bbox.height;
+
+                    // only substract empty lines
+                    // lineCount = Math.floor(height / bbox.height) - lines.length;
+                    lineCount = Math.floor(height / bbox.height);
+                    lineCountCalculated = true;
+                }
+
+                if (newLine) {
+                    // set the label height
+                    tspan.attr('y', lineHeight * i);
+                    newLine = false;
+                }
+
+                // if this word caused us to go too far
+                if (tspan.node().getComputedTextLength() > width) {
+                    // remove the current word
+                    line.pop();
+
+                    // update the label text
+                    tspan.text(line.join(' '));
+
+                    // create the tspan for the next line
+                    tspan = selection.append('tspan').attr('x', x).attr('dy', '1.2em').attr('width', width);
+
+                    // if we've reached the last line, use single line ellipsis
+                    if (++i >= lineCount) {
+                        // get the remainder using the current word and
+                        // reversing whats left
+                        const remainder = [word].concat(words.reverse());
+
+                        // apply ellipsis to the last line
+                        this.ellipsis(tspan, remainder.join(' '), cacheName);
+
+                        // we've reached the line count
+                        return;
+                    } else {
+                        tspan.text(word);
+
+                        // prep the line for the next iteration
+                        line = [word];
+                    }
+                } else {
+                    i++;
+                }
+
+                // get the next word
+                word = words.pop();
+            }
+
+            if (newLine) {
+                // set the label height
+                tspan.attr('y', lineHeight * i++);
+                newLine = false;
+            }
+        }
+    }
+
+    /**
+     * Applies multiline ellipsis to the component in the specified selection. Text will
      * wrap for the specified number of lines. The last line will be ellipsis if necessary.
      *
      * @param {selection} selection

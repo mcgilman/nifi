@@ -16,8 +16,8 @@
  */
 
 import { ComponentRef, Injectable, Renderer2, ViewContainerRef } from '@angular/core';
-import { Editor, Hint, Hints, StringStream } from 'codemirror';
 import * as CodeMirror from 'codemirror';
+import { Editor, Hint, Hints, StringStream } from 'codemirror';
 import { ParameterTip } from '../../components/tooltips/parameter-tip/parameter-tip.component';
 import { NiFiCommon, Parameter } from '../..';
 

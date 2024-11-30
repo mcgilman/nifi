@@ -46,5 +46,7 @@ export class AppComponent {
                 this.themingService.toggleTheme(e.matches, theme);
             });
         }
+
+        this.nfel.getLanguageId();
     }
 }

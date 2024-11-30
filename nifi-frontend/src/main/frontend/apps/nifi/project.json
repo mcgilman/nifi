@@ -55,11 +55,11 @@
                         {
                             "type": "initial",
                             "maximumWarning": "2mb",
-                            "maximumError": "3mb"
+                            "maximumError": "6mb"
                         }
                     ],
-                    "outputHashing": "all",
-                    "optimization": true
+                    "outputHashing": "none",
+                    "optimization": false
                 },
                 "development": {
                     "optimization": false,

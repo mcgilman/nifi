@@ -207,7 +207,7 @@ import org.apache.nifi.registry.flow.mapping.InstantiatedVersionedComponent;
 import org.apache.nifi.registry.flow.mapping.InstantiatedVersionedPort;
 import org.apache.nifi.registry.flow.mapping.InstantiatedVersionedProcessGroup;
 import org.apache.nifi.registry.flow.mapping.InstantiatedVersionedRemoteGroupPort;
-import org.apache.nifi.registry.flow.mapping.NiFiRegistryFlowMapper;
+import org.apache.nifi.registry.flow.mapping.VersionedComponentFlowMapper;
 import org.apache.nifi.registry.flow.mapping.VersionedComponentStateLookup;
 import org.apache.nifi.remote.RemoteGroupPort;
 import org.apache.nifi.reporting.Bulletin;
@@ -5293,7 +5293,7 @@ public class StandardNiFiServiceFacade implements NiFiServiceFacade {
                 .mapAssetReferences(false)
                 .build();
 
-        final NiFiRegistryFlowMapper mapper = makeNiFiRegistryFlowMapper(controllerFacade.getExtensionManager(), mappingOptions);
+        final VersionedComponentFlowMapper mapper = makeNiFiRegistryFlowMapper(controllerFacade.getExtensionManager(), mappingOptions);
         final InstantiatedVersionedProcessGroup versionedProcessGroup =
                 mapper.mapProcessGroup(processGroup, controllerFacade.getControllerServiceProvider(), controllerFacade.getFlowManager(), true);
 
@@ -5402,7 +5402,7 @@ public class StandardNiFiServiceFacade implements NiFiServiceFacade {
 
         // Create a complete (include descendant flows) VersionedProcessGroup snapshot of the flow as it is
         // currently without any registry related fields populated, even if the flow is currently versioned.
-        final NiFiRegistryFlowMapper mapper = makeNiFiRegistryFlowMapper(controllerFacade.getExtensionManager());
+        final VersionedComponentFlowMapper mapper = makeNiFiRegistryFlowMapper(controllerFacade.getExtensionManager());
         final InstantiatedVersionedProcessGroup nonVersionedProcessGroup =
                 mapper.mapNonVersionedProcessGroup(processGroup, controllerFacade.getControllerServiceProvider());
 
@@ -5577,13 +5577,13 @@ public class StandardNiFiServiceFacade implements NiFiServiceFacade {
 
     private InstantiatedVersionedProcessGroup createFlowSnapshot(final String processGroupId) {
         final ProcessGroup processGroup = processGroupDAO.getProcessGroup(processGroupId);
-        final NiFiRegistryFlowMapper mapper = makeNiFiRegistryFlowMapper(controllerFacade.getExtensionManager());
+        final VersionedComponentFlowMapper mapper = makeNiFiRegistryFlowMapper(controllerFacade.getExtensionManager());
         final InstantiatedVersionedProcessGroup versionedGroup = mapper.mapProcessGroup(processGroup, controllerFacade.getControllerServiceProvider(), controllerFacade.getFlowManager(), false);
         return versionedGroup;
     }
 
     private Map<String, VersionedParameterContext> createVersionedParameterContexts(final ProcessGroup processGroup, final Map<String, ParameterProviderReference> parameterProviderReferences) {
-        final NiFiRegistryFlowMapper mapper = makeNiFiRegistryFlowMapper(controllerFacade.getExtensionManager());
+        final VersionedComponentFlowMapper mapper = makeNiFiRegistryFlowMapper(controllerFacade.getExtensionManager());
         return mapper.mapParameterContexts(processGroup, false, parameterProviderReferences);
     }
 
@@ -5615,7 +5615,7 @@ public class StandardNiFiServiceFacade implements NiFiServiceFacade {
             }
         }
 
-        final NiFiRegistryFlowMapper mapper = makeNiFiRegistryFlowMapper(controllerFacade.getExtensionManager());
+        final VersionedComponentFlowMapper mapper = makeNiFiRegistryFlowMapper(controllerFacade.getExtensionManager());
         final VersionedProcessGroup localGroup = mapper.mapProcessGroup(processGroup, controllerFacade.getControllerServiceProvider(), controllerFacade.getFlowManager(), true);
 
         final ComparableDataFlow localFlow = new StandardComparableDataFlow("Local Flow", localGroup);
@@ -5779,7 +5779,7 @@ public class StandardNiFiServiceFacade implements NiFiServiceFacade {
     public Set<AffectedComponentEntity> getComponentsAffectedByFlowUpdate(final String processGroupId, final RegisteredFlowSnapshot updatedSnapshot) {
         final ProcessGroup group = processGroupDAO.getProcessGroup(processGroupId);
 
-        final NiFiRegistryFlowMapper mapper = makeNiFiRegistryFlowMapper(controllerFacade.getExtensionManager());
+        final VersionedComponentFlowMapper mapper = makeNiFiRegistryFlowMapper(controllerFacade.getExtensionManager());
         final VersionedProcessGroup localContents = mapper.mapProcessGroup(group, controllerFacade.getControllerServiceProvider(), controllerFacade.getFlowManager(), true);
 
         final ComparableDataFlow localFlow = new StandardComparableDataFlow("Current Flow", localContents);
@@ -6012,7 +6012,7 @@ public class StandardNiFiServiceFacade implements NiFiServiceFacade {
             if (versionedIdOption.isPresent()) {
                 versionedId = versionedIdOption.get();
             } else {
-                versionedId = NiFiRegistryFlowMapper.generateVersionedComponentId(connectable.getIdentifier());
+                versionedId = VersionedComponentFlowMapper.generateVersionedComponentId(connectable.getIdentifier());
             }
 
             final List<Connectable> byVersionedId = destination.computeIfAbsent(versionedId, key -> new ArrayList<>());
@@ -7223,8 +7223,8 @@ public class StandardNiFiServiceFacade implements NiFiServiceFacade {
      * @param extensionManager the extension manager to create the flow mapper with
      * @return a new NiFiRegistryFlowMapper instance
      */
-    protected NiFiRegistryFlowMapper makeNiFiRegistryFlowMapper(final ExtensionManager extensionManager) {
-        return new NiFiRegistryFlowMapper(extensionManager);
+    protected VersionedComponentFlowMapper makeNiFiRegistryFlowMapper(final ExtensionManager extensionManager) {
+        return new VersionedComponentFlowMapper(extensionManager);
     }
 
     /**
@@ -7234,8 +7234,8 @@ public class StandardNiFiServiceFacade implements NiFiServiceFacade {
      * @param options          the flow mapping options
      * @return a new NiFiRegistryFlowMapper instance
      */
-    protected NiFiRegistryFlowMapper makeNiFiRegistryFlowMapper(final ExtensionManager extensionManager, final FlowMappingOptions options) {
-        return new NiFiRegistryFlowMapper(extensionManager, options);
+    protected VersionedComponentFlowMapper makeNiFiRegistryFlowMapper(final ExtensionManager extensionManager, final FlowMappingOptions options) {
+        return new VersionedComponentFlowMapper(extensionManager, options);
     }
 
     @Autowired

@@ -29,10 +29,12 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import org.apache.http.conn.ssl.DefaultHostnameVerifier;
 import org.apache.nifi.annotation.lifecycle.OnScheduled;
 import org.apache.nifi.annotation.lifecycle.OnStopped;
+import org.apache.nifi.components.AllowableValue;
 import org.apache.nifi.components.ConfigVerificationResult;
 import org.apache.nifi.components.ConfigVerificationResult.Outcome;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.PropertyValue;
+import org.apache.nifi.components.connector.components.ConnectorMethod;
 import org.apache.nifi.context.PropertyContext;
 import org.apache.nifi.expression.ExpressionLanguageScope;
 import org.apache.nifi.logging.ComponentLog;
@@ -44,6 +46,7 @@ import org.apache.nifi.processor.Relationship;
 import org.apache.nifi.processor.VerifiableProcessor;
 import org.apache.nifi.processor.util.StandardValidators;
 import org.apache.nifi.processors.aws.credentials.provider.service.AWSCredentialsProviderService;
+import org.apache.nifi.processors.aws.v2.RegionUtilV2;
 import org.apache.nifi.proxy.ProxyConfiguration;
 import org.apache.nifi.proxy.ProxySpec;
 import org.apache.nifi.ssl.SSLContextProvider;
@@ -55,6 +58,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import static org.apache.nifi.processors.aws.util.RegionUtilV1.REGION;
 
@@ -323,6 +327,13 @@ public abstract class AbstractAWSCredentialsProviderProcessor<ClientType extends
         }
 
         return null;
+    }
+
+    @ConnectorMethod(name="getAvailableRegions", description="Returns the list of available AWS regions")
+    public List<String> getAvailableRegions() {
+        return Stream.of(RegionUtilV2.getAvailableRegions())
+            .map(AllowableValue::getValue)
+            .toList();
     }
 
     /**

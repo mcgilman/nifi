@@ -20,6 +20,9 @@ import org.apache.nifi.web.api.dto.action.ActionDTO;
 import org.apache.nifi.web.api.dto.diagnostics.ProcessorDiagnosticsDTO;
 import org.apache.nifi.web.api.dto.flow.FlowBreadcrumbDTO;
 import org.apache.nifi.web.api.dto.flow.ProcessGroupFlowDTO;
+import org.apache.nifi.web.api.entity.ConfigurationStepEntity;
+import org.apache.nifi.web.api.entity.ConfigurationStepNamesEntity;
+import org.apache.nifi.web.api.entity.ConnectorEntity;
 import org.apache.nifi.web.api.dto.status.ConnectionStatisticsDTO;
 import org.apache.nifi.web.api.dto.status.ConnectionStatisticsSnapshotDTO;
 import org.apache.nifi.web.api.dto.status.ConnectionStatusDTO;
@@ -61,6 +64,8 @@ import org.apache.nifi.web.api.entity.FunnelEntity;
 import org.apache.nifi.web.api.entity.LabelEntity;
 import org.apache.nifi.web.api.entity.NarSummaryEntity;
 import org.apache.nifi.web.api.entity.ParameterContextEntity;
+import org.apache.nifi.web.api.dto.ConnectorDTO;
+import org.apache.nifi.web.api.dto.ConfigurationStepConfigurationDTO;
 import org.apache.nifi.web.api.entity.ParameterContextReferenceEntity;
 import org.apache.nifi.web.api.entity.ParameterProviderEntity;
 import org.apache.nifi.web.api.entity.ParameterProviderReferencingComponentEntity;
@@ -121,6 +126,21 @@ public final class EntityFactory {
         final ProcessorStatusEntity entity = new ProcessorStatusEntity();
         entity.setCanRead(permissions.getCanRead());
         entity.setProcessorStatus(status); // always set the status, as it's always allowed... just need to provide permission context for merging responses
+        return entity;
+    }
+
+    public ConnectorEntity createConnectorEntity(final ConnectorDTO dto,
+                                                 final RevisionDTO revision,
+                                                 final PermissionsDTO permissions) {
+        final ConnectorEntity entity = new ConnectorEntity();
+        entity.setRevision(revision);
+        if (dto != null) {
+            entity.setPermissions(permissions);
+            entity.setId(dto.getId());
+            if (permissions != null && permissions.getCanRead()) {
+                entity.setComponent(dto);
+            }
+        }
         return entity;
     }
 
@@ -841,5 +861,51 @@ public final class EntityFactory {
 
     public NarSummaryEntity createNarSummaryEntity(final NarSummaryDTO narSummaryDTO) {
         return new NarSummaryEntity(narSummaryDTO);
+    }
+
+    public ConfigurationStepNamesEntity createConfigurationStepNamesEntity(final ConnectorDTO connectorDto) {
+        final ConfigurationStepNamesEntity entity = new ConfigurationStepNamesEntity();
+        
+        final List<String> configurationStepNames;
+        if (connectorDto != null && 
+            connectorDto.getWorkingConfiguration() != null &&
+            connectorDto.getWorkingConfiguration().getConfigurationStepConfigurations() != null) {
+            
+            configurationStepNames = connectorDto.getWorkingConfiguration().getConfigurationStepConfigurations()
+                    .stream()
+                    .map(ConfigurationStepConfigurationDTO::getConfigurationStepName)
+                    .collect(Collectors.toList());
+        } else {
+            configurationStepNames = List.of();
+        }
+        
+        entity.setConfigurationStepNames(configurationStepNames);
+        return entity;
+    }
+
+    public ConfigurationStepEntity createConfigurationStepEntity(final ConnectorDTO connectorDto, final String configurationStepName, 
+                                                                 final RevisionDTO parentConnectorRevision) {
+        ConfigurationStepConfigurationDTO foundConfigurationStep = null;
+        
+        if (connectorDto != null && 
+            connectorDto.getWorkingConfiguration() != null &&
+            connectorDto.getWorkingConfiguration().getConfigurationStepConfigurations() != null) {
+            
+            foundConfigurationStep = connectorDto.getWorkingConfiguration().getConfigurationStepConfigurations()
+                    .stream()
+                    .filter(step -> configurationStepName.equals(step.getConfigurationStepName()))
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        if (foundConfigurationStep == null) {
+            throw new IllegalArgumentException(String.format("Configuration step '%s' not found for connector '%s'.", configurationStepName, connectorDto != null ? connectorDto.getId() : "null"));
+        }
+
+        final ConfigurationStepEntity entity = new ConfigurationStepEntity();
+        entity.setConfigurationStep(foundConfigurationStep);
+        entity.setParentConnectorId(connectorDto != null ? connectorDto.getId() : null);
+        entity.setParentConnectorRevision(parentConnectorRevision);
+        return entity;
     }
 }

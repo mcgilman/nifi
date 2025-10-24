@@ -24,6 +24,12 @@ import org.apache.nifi.cluster.coordination.http.endpoints.ClearBulletinsEndpoin
 import org.apache.nifi.cluster.coordination.http.endpoints.ClearBulletinsForGroupEndpointMerger;
 import org.apache.nifi.cluster.coordination.http.endpoints.ComponentStateEndpointMerger;
 import org.apache.nifi.cluster.coordination.http.endpoints.ConnectionEndpointMerger;
+import org.apache.nifi.cluster.coordination.http.endpoints.ConnectorConfigurationStepVerificationEndpointMerger;
+import org.apache.nifi.cluster.coordination.http.endpoints.ConnectorEndpointMerger;
+import org.apache.nifi.cluster.coordination.http.endpoints.ConnectorFlowEndpointMerger;
+import org.apache.nifi.cluster.coordination.http.endpoints.ConnectorPropertyGroupEndpointMerger;
+import org.apache.nifi.cluster.coordination.http.endpoints.ConnectorPropertyGroupNamesEndpointMerger;
+import org.apache.nifi.cluster.coordination.http.endpoints.ConnectorsEndpointMerger;
 import org.apache.nifi.cluster.coordination.http.endpoints.ConnectionStatusEndpointMerger;
 import org.apache.nifi.cluster.coordination.http.endpoints.ConnectionsEndpointMerger;
 import org.apache.nifi.cluster.coordination.http.endpoints.ControllerBulletinsEndpointMerger;
@@ -138,6 +144,12 @@ public class StandardHttpResponseMapper implements HttpResponseMapper {
         endpointMergers.add(new ProcessorEndpointMerger());
         endpointMergers.add(new ProcessorsEndpointMerger());
         endpointMergers.add(new ProcessorRunStatusDetailsEndpointMerger());
+        endpointMergers.add(new ConnectorEndpointMerger());
+        endpointMergers.add(new ConnectorsEndpointMerger());
+        endpointMergers.add(new ConnectorFlowEndpointMerger());
+        endpointMergers.add(new ConnectorPropertyGroupEndpointMerger());
+        endpointMergers.add(new ConnectorPropertyGroupNamesEndpointMerger());
+        endpointMergers.add(new ConnectorConfigurationStepVerificationEndpointMerger());
         endpointMergers.add(new ConnectionEndpointMerger());
         endpointMergers.add(new ConnectionsEndpointMerger());
         endpointMergers.add(new PortEndpointMerger());

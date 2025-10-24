@@ -42,6 +42,8 @@ import org.apache.nifi.c2.protocol.component.api.RuntimeManifest;
 import org.apache.nifi.cluster.protocol.NodeIdentifier;
 import org.apache.nifi.components.ConfigurableComponent;
 import org.apache.nifi.components.RequiredPermission;
+import org.apache.nifi.components.connector.Connector;
+import org.apache.nifi.components.connector.ConnectorNode;
 import org.apache.nifi.connectable.Connectable;
 import org.apache.nifi.connectable.Connection;
 import org.apache.nifi.connectable.Port;
@@ -484,6 +486,18 @@ public class ControllerFacade implements Authorizable {
      */
     public Set<DocumentedTypeDTO> getFlowFileProcessorTypes(final String bundleGroupFilter, final String bundleArtifactFilter, final String typeFilter) {
         return dtoFactory.fromDocumentedTypes(getExtensionManager().getExtensions(Processor.class), bundleGroupFilter, bundleArtifactFilter, typeFilter);
+    }
+
+    /**
+     * Gets the Connector types that this controller supports.
+     *
+     * @param bundleGroupFilter    if specified, must be member of bundle group
+     * @param bundleArtifactFilter if specified, must be member of bundle artifact
+     * @param typeFilter           if specified, type must match
+     * @return types
+     */
+    public Set<DocumentedTypeDTO> getConnectorTypes(final String bundleGroupFilter, final String bundleArtifactFilter, final String typeFilter) {
+        return dtoFactory.fromDocumentedTypes(getExtensionManager().getExtensions(Connector.class), bundleGroupFilter, bundleArtifactFilter, typeFilter);
     }
 
     /**
@@ -997,6 +1011,7 @@ public class ControllerFacade implements Authorizable {
         resources.add(ResourceFactory.getResourceResource());
         resources.add(ResourceFactory.getSiteToSiteResource());
         resources.add(ResourceFactory.getParameterContextsResource());
+        resources.add(ResourceFactory.getConnectorsResource());
 
         // add each parameter context
         flowController.getFlowManager().getParameterContextManager().getParameterContexts().forEach(parameterContext -> resources.add(parameterContext.getResource()));
@@ -1111,6 +1126,14 @@ public class ControllerFacade implements Authorizable {
             resources.add(flowRegistryResource);
             resources.add(ResourceFactory.getPolicyResource(flowRegistryResource));
             resources.add(ResourceFactory.getOperationResource(flowRegistryResource));
+        }
+
+        // add each connector
+        for (final ConnectorNode connector : flowController.getFlowManager().getAllConnectors()) {
+            final Resource connectorResource = connector.getResource();
+            resources.add(connectorResource);
+            resources.add(ResourceFactory.getPolicyResource(connectorResource));
+            resources.add(ResourceFactory.getOperationResource(connectorResource));
         }
 
         return resources;

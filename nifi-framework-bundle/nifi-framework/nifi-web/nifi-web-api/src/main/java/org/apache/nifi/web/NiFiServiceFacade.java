@@ -80,6 +80,8 @@ import org.apache.nifi.web.api.dto.PropertyDescriptorDTO;
 import org.apache.nifi.web.api.dto.RemoteProcessGroupDTO;
 import org.apache.nifi.web.api.dto.RemoteProcessGroupPortDTO;
 import org.apache.nifi.web.api.dto.ReportingTaskDTO;
+import org.apache.nifi.web.api.dto.ConnectorDTO;
+import org.apache.nifi.web.api.dto.ConfigurationStepConfigurationDTO;
 import org.apache.nifi.web.api.dto.ResourceDTO;
 import org.apache.nifi.web.api.dto.SnippetDTO;
 import org.apache.nifi.web.api.dto.SystemDiagnosticsDTO;
@@ -144,6 +146,9 @@ import org.apache.nifi.web.api.entity.RemoteProcessGroupEntity;
 import org.apache.nifi.web.api.entity.RemoteProcessGroupPortEntity;
 import org.apache.nifi.web.api.entity.RemoteProcessGroupStatusEntity;
 import org.apache.nifi.web.api.entity.ReportingTaskEntity;
+import org.apache.nifi.web.api.entity.ConnectorEntity;
+import org.apache.nifi.web.api.entity.ConfigurationStepEntity;
+import org.apache.nifi.web.api.entity.ConfigurationStepNamesEntity;
 import org.apache.nifi.web.api.entity.ScheduleComponentsEntity;
 import org.apache.nifi.web.api.entity.SnippetEntity;
 import org.apache.nifi.web.api.entity.StartVersionControlRequestEntity;
@@ -172,6 +177,43 @@ import java.util.function.Supplier;
  * Defines the NiFiServiceFacade interface.
  */
 public interface NiFiServiceFacade {
+    // ----------------------------------------
+    // Connector methods
+    // ----------------------------------------
+
+    void verifyCreateConnector(ConnectorDTO connectorDTO);
+
+    ConnectorEntity createConnector(Revision revision, ConnectorDTO connectorDTO);
+
+    Set<ConnectorEntity> getConnectors();
+
+    ConnectorEntity getConnector(String id);
+
+    void verifyUpdateConnector(ConnectorDTO connectorDTO);
+
+    ConnectorEntity updateConnector(Revision revision, ConnectorDTO connectorDTO);
+
+    void verifyDeleteConnector(String id);
+
+    ConnectorEntity deleteConnector(Revision revision, String id);
+
+    ConnectorEntity scheduleConnector(Revision revision, String id, ScheduledState state);
+
+    ConfigurationStepNamesEntity getConnectorConfigurationSteps(String id);
+
+    ConfigurationStepEntity getConnectorConfigurationStep(String id, String configurationStepName);
+
+    ConfigurationStepEntity updateConnectorConfigurationStep(Revision revision, String id, String configurationStepName, ConfigurationStepConfigurationDTO configurationStepConfiguration);
+
+    ConnectorEntity prepareConnectorForUpdate(Revision revision, String connectorId);
+
+    ConnectorEntity finishConnectorUpdate(Revision revision, String connectorId);
+
+    ProcessGroupFlowEntity getConnectorFlow(String id, boolean uiOnly);
+
+    void verifyCanVerifyConnectorConfigurationStep(String connectorId, String configurationStepName);
+
+    List<ConfigVerificationResultDTO> performConnectorConfigurationStepVerification(String connectorId, String configurationStepName, Map<String, String> properties);
 
     // ----------------------------------------
     // Synchronization methods
@@ -469,6 +511,16 @@ public interface NiFiServiceFacade {
      * @return The list of available processor types matching specified criteria
      */
     Set<DocumentedTypeDTO> getProcessorTypes(final String bundleGroupFilter, final String bundleArtifactFilter, final String typeFilter);
+
+    /**
+     * Returns the list of connector types.
+     *
+     * @param bundleGroupFilter if specified, must be member of bundle group
+     * @param bundleArtifactFilter if specified, must be member of bundle artifact
+     * @param typeFilter if specified, type must match
+     * @return The list of available connector types matching specified criteria
+     */
+    Set<DocumentedTypeDTO> getConnectorTypes(final String bundleGroupFilter, final String bundleArtifactFilter, final String typeFilter);
 
     /**
      * Returns the list of controller service types.

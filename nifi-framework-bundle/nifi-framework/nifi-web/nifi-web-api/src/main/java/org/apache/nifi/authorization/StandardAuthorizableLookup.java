@@ -58,6 +58,7 @@ import org.apache.nifi.web.api.dto.FlowSnippetDTO;
 import org.apache.nifi.web.controller.ControllerFacade;
 import org.apache.nifi.web.dao.AccessPolicyDAO;
 import org.apache.nifi.web.dao.ConnectionDAO;
+import org.apache.nifi.web.dao.ConnectorDAO;
 import org.apache.nifi.web.dao.ControllerServiceDAO;
 import org.apache.nifi.web.dao.FlowAnalysisRuleDAO;
 import org.apache.nifi.web.dao.FlowRegistryDAO;
@@ -123,6 +124,7 @@ public class StandardAuthorizableLookup implements AuthorizableLookup {
         }
     };
 
+
     private static final Authorizable RESOURCE_AUTHORIZABLE = new Authorizable() {
         @Override
         public Authorizable getParentAuthorizable() {
@@ -186,6 +188,7 @@ public class StandardAuthorizableLookup implements AuthorizableLookup {
     private PortDAO inputPortDAO;
     private PortDAO outputPortDAO;
     private ConnectionDAO connectionDAO;
+    private ConnectorDAO connectorDAO;
     private ControllerServiceDAO controllerServiceDAO;
     private ReportingTaskDAO reportingTaskDAO;
     private FlowAnalysisRuleDAO flowAnalysisRuleDAO;
@@ -218,6 +221,11 @@ public class StandardAuthorizableLookup implements AuthorizableLookup {
     public ComponentAuthorizable getProcessor(final String id) {
         final ProcessorNode processorNode = processorDAO.getProcessor(id);
         return new ProcessorComponentAuthorizable(processorNode, controllerFacade.getExtensionManager());
+    }
+
+    @Override
+    public Authorizable getConnector(final String id) {
+        return connectorDAO.getConnector(id);
     }
 
     @Override
@@ -650,6 +658,7 @@ public class StandardAuthorizableLookup implements AuthorizableLookup {
             case FlowAnalysisRule -> getFlowAnalysisRule(componentId).getAuthorizable();
             case ParameterContext -> getParameterContext(componentId);
             case ParameterProvider -> getParameterProvider(componentId).getAuthorizable();
+            case Connector -> getConnector(componentId);
             default -> null;
         };
 
@@ -735,6 +744,9 @@ public class StandardAuthorizableLookup implements AuthorizableLookup {
                 break;
             case ParameterContext:
                 authorizable = getParameterContexts();
+                break;
+            case Connector:
+                authorizable = getConnectors();
                 break;
         }
 
@@ -824,6 +836,21 @@ public class StandardAuthorizableLookup implements AuthorizableLookup {
             @Override
             public Resource getResource() {
                 return ResourceFactory.getParameterContextsResource();
+            }
+        };
+    }
+
+    @Override
+    public Authorizable getConnectors() {
+        return new Authorizable() {
+            @Override
+            public Authorizable getParentAuthorizable() {
+                return null;
+            }
+
+            @Override
+            public Resource getResource() {
+                return ResourceFactory.getConnectorsResource();
             }
         };
     }
@@ -1407,6 +1434,11 @@ public class StandardAuthorizableLookup implements AuthorizableLookup {
     @Autowired
     public void setConnectionDAO(ConnectionDAO connectionDAO) {
         this.connectionDAO = connectionDAO;
+    }
+
+    @Autowired
+    public void setConnectorDAO(ConnectorDAO connectorDAO) {
+        this.connectorDAO = connectorDAO;
     }
 
     @Autowired

@@ -63,6 +63,14 @@ public interface AuthorizableLookup {
     ComponentAuthorizable getProcessor(String id);
 
     /**
+     * Get the authorizable Connector.
+     *
+     * @param id connector id
+     * @return authorizable
+     */
+    Authorizable getConnector(String id);
+
+    /**
      * Get the authorizable for querying Provenance.
      *
      * @return authorizable
@@ -255,6 +263,12 @@ public interface AuthorizableLookup {
      * @return authorizable
      */
     Authorizable getParameterContexts();
+
+    /**
+     * Get the authorizable for Connectors
+     * @return authorizable
+     */
+    Authorizable getConnectors();
 
     /**
      * Get the authorizable connectable. Note this does not include RemoteGroupPorts.

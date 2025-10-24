@@ -36,10 +36,13 @@ import org.apache.nifi.prometheusutil.JvmMetricsRegistry;
 import org.apache.nifi.prometheusutil.NiFiMetricsRegistry;
 import org.apache.nifi.prometheusutil.PrometheusMetricsUtil;
 import org.apache.nifi.registry.flow.FlowVersionLocation;
+import org.apache.nifi.authorization.AccessDeniedException;
+import org.apache.nifi.authorization.AuthorizeAccess;
 import org.apache.nifi.web.NiFiServiceFacade;
 import org.apache.nifi.web.ResourceNotFoundException;
 import org.apache.nifi.web.api.dto.ComponentDifferenceDTO;
 import org.apache.nifi.web.api.dto.DifferenceDTO;
+import org.apache.nifi.web.api.entity.ConnectorEntity;
 import org.apache.nifi.web.api.entity.FlowComparisonEntity;
 import org.apache.nifi.web.api.request.FlowMetricsProducer;
 import org.jetbrains.annotations.NotNull;
@@ -76,6 +79,9 @@ import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -417,6 +423,31 @@ public class TestFlowResource {
     @Test
     public void testWithProcessorPerformanceStatus() {
 
+    }
+
+    @Test
+    public void testGetConnectors() {
+        final ConnectorEntity connectorEntity = new ConnectorEntity();
+
+        when(serviceFacade.getConnectors()).thenReturn(Set.of(connectorEntity));
+
+        try (Response response = resource.getConnectors()) {
+            assertEquals(200, response.getStatus());
+            assertNotNull(response.getEntity());
+        }
+
+        verify(serviceFacade).authorizeAccess(any(AuthorizeAccess.class));
+        verify(serviceFacade).getConnectors();
+    }
+
+    @Test
+    public void testGetConnectorsNotAuthorized() {
+        doThrow(AccessDeniedException.class).when(serviceFacade).authorizeAccess(any(AuthorizeAccess.class));
+
+        assertThrows(AccessDeniedException.class, () -> resource.getConnectors());
+
+        verify(serviceFacade).authorizeAccess(any(AuthorizeAccess.class));
+        verify(serviceFacade, never()).getConnectors();
     }
 
     private void setUpGetVersionDifference() {

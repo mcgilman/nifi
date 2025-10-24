@@ -63,6 +63,7 @@ import org.apache.nifi.cluster.event.NodeEvent;
 import org.apache.nifi.cluster.manager.StatusMerger;
 import org.apache.nifi.cluster.protocol.NodeIdentifier;
 import org.apache.nifi.components.AllowableValue;
+import org.apache.nifi.components.ConfigVerificationResult;
 import org.apache.nifi.components.PropertyDependency;
 import org.apache.nifi.components.PropertyDescriptor;
 import org.apache.nifi.components.ValidationResult;
@@ -71,6 +72,7 @@ import org.apache.nifi.components.state.StateMap;
 import org.apache.nifi.components.validation.ValidationState;
 import org.apache.nifi.components.validation.ValidationStatus;
 import org.apache.nifi.connectable.Connectable;
+import org.apache.nifi.components.connector.ConnectorNode;
 import org.apache.nifi.connectable.ConnectableType;
 import org.apache.nifi.connectable.Connection;
 import org.apache.nifi.connectable.Funnel;
@@ -5208,4 +5210,166 @@ public final class DtoFactory {
 
         return performanceStatusDTO;
     }
+
+    public ConnectorDTO createConnectorDto(final ConnectorNode connector) {
+        if (connector == null) {
+            return null;
+        }
+
+        final ConnectorDTO dto = new ConnectorDTO();
+        dto.setId(connector.getIdentifier());
+        dto.setName(connector.getName());
+        
+        final String canonicalName = connector.getConnector().getClass().getCanonicalName();
+        dto.setType(canonicalName != null ? canonicalName : connector.getConnector().getClass().getName());
+        
+        dto.setBundle(createBundleDto(connector.getBundleCoordinate()));
+        dto.setState(connector.getCurrentState().name());
+        dto.setActiveConfiguration(createConnectorConfigurationDtoFromFlowContext(connector, connector.getActiveFlowContext()));
+        dto.setWorkingConfiguration(createConnectorConfigurationDtoFromFlowContext(connector, connector.getWorkingFlowContext()));
+
+        return dto;
+    }
+
+    private ConnectorConfigurationDTO createConnectorConfigurationDtoFromFlowContext(final ConnectorNode connector, final org.apache.nifi.components.connector.FrameworkFlowContext flowContext) {
+        final List<org.apache.nifi.components.connector.ConfigurationStep> configurationSteps = connector.getConfigurationSteps();
+        if (configurationSteps == null || configurationSteps.isEmpty()) {
+            return null;
+        }
+
+        if (flowContext == null || flowContext.getConfigurationContext() == null) {
+            return null;
+        }
+
+        final org.apache.nifi.components.connector.ConnectorConfiguration configuration = flowContext.getConfigurationContext().toConnectorConfiguration();
+        final ConnectorConfigurationDTO dto = new ConnectorConfigurationDTO();
+        final List<ConfigurationStepConfigurationDTO> configurationStepDtos = configurationSteps.stream()
+                .map(step -> createConfigurationStepConfigurationDtoFromStep(step, configuration))
+                .collect(Collectors.toList());
+        dto.setConfigurationStepConfigurations(configurationStepDtos);
+        return dto;
+    }
+
+    private ConfigurationStepConfigurationDTO createConfigurationStepConfigurationDtoFromStep(final org.apache.nifi.components.connector.ConfigurationStep step,
+                                                                                              final org.apache.nifi.components.connector.ConnectorConfiguration configuration) {
+        if (step == null) {
+            return null;
+        }
+
+        final ConfigurationStepConfigurationDTO dto = new ConfigurationStepConfigurationDTO();
+        dto.setConfigurationStepName(step.getName());
+        dto.setConfigurationStepDescription(step.getDescription());
+        
+        // Get the current configuration values for this step
+        final org.apache.nifi.components.connector.ConfigurationStepConfiguration stepConfig = configuration.getConfigurationStepConfigurations().stream()
+                .filter(c -> step.getName().equals(c.stepName()))
+                .findFirst()
+                .orElse(null);
+
+        // Convert property groups from the schema, merging in current values
+        final List<PropertyGroupConfigurationDTO> propertyGroupDtos = step.getPropertyGroups().stream()
+                .map(propertyGroup -> createPropertyGroupConfigurationDtoFromGroup(propertyGroup, stepConfig))
+                .collect(Collectors.toList());
+        dto.setPropertyGroupConfigurations(propertyGroupDtos);
+        return dto;
+    }
+
+    private PropertyGroupConfigurationDTO createPropertyGroupConfigurationDtoFromGroup(final org.apache.nifi.components.connector.ConnectorPropertyGroup propertyGroup,
+                                                                                       final org.apache.nifi.components.connector.ConfigurationStepConfiguration stepConfig) {
+        if (propertyGroup == null) {
+            return null;
+        }
+
+        final PropertyGroupConfigurationDTO dto = new PropertyGroupConfigurationDTO();
+        dto.setPropertyGroupName(propertyGroup.getName());
+        dto.setPropertyGroupDescription(propertyGroup.getDescription());
+        
+        // Convert property descriptors from the schema, keyed by property name
+        // Use LinkedHashMap to preserve the order from the connector
+        final Map<String, ConnectorPropertyDescriptorDTO> propertyDescriptorMap = new LinkedHashMap<>();
+        for (final org.apache.nifi.components.connector.ConnectorPropertyDescriptor propertyDescriptor : propertyGroup.getProperties()) {
+            final ConnectorPropertyDescriptorDTO descriptorDto = createConnectorPropertyDescriptorDto(propertyDescriptor);
+            propertyDescriptorMap.put(descriptorDto.getName(), descriptorDto);
+        }
+        dto.setPropertyDescriptors(propertyDescriptorMap);
+        
+        // Get the current property values for this group if they exist
+        // Use LinkedHashMap to preserve the order from the connector
+        final Map<String, String> propertyValues = new LinkedHashMap<>();
+        if (stepConfig != null) {
+            final org.apache.nifi.components.connector.PropertyGroupConfiguration groupConfig = stepConfig.propertyGroupConfigurations().stream()
+                    .filter(g -> propertyGroup.getName().equals(g.groupName()))
+                    .findFirst()
+                    .orElse(null);
+            
+            if (groupConfig != null) {
+                propertyValues.putAll(groupConfig.propertyValues());
+            }
+        }
+        
+        dto.setPropertyValues(propertyValues);
+        return dto;
+    }
+
+    private ConnectorPropertyDescriptorDTO createConnectorPropertyDescriptorDto(final org.apache.nifi.components.connector.ConnectorPropertyDescriptor propertyDescriptor) {
+        if (propertyDescriptor == null) {
+            return null;
+        }
+
+        final ConnectorPropertyDescriptorDTO dto = new ConnectorPropertyDescriptorDTO();
+        dto.setName(propertyDescriptor.getName());
+        dto.setDescription(propertyDescriptor.getDescription());
+        dto.setDefaultValue(propertyDescriptor.getDefaultValue());
+        dto.setRequired(propertyDescriptor.isRequired());
+        dto.setType(propertyDescriptor.getType() != null ? propertyDescriptor.getType().name() : null);
+        dto.setAllowableValuesFetchable(propertyDescriptor.isAllowableValuesFetchable());
+        
+        // Convert allowable values if present
+        if (propertyDescriptor.getAllowableValues() != null && !propertyDescriptor.getAllowableValues().isEmpty()) {
+            final List<AllowableValueEntity> allowableValueEntities = propertyDescriptor.getAllowableValues().stream()
+                    .map(describedValue -> {
+                        final AllowableValueDTO allowableValueDto = new AllowableValueDTO();
+                        allowableValueDto.setValue(describedValue.getValue());
+                        allowableValueDto.setDisplayName(describedValue.getDisplayName());
+                        allowableValueDto.setDescription(describedValue.getDescription());
+                        
+                        final AllowableValueEntity entity = new AllowableValueEntity();
+                        entity.setAllowableValue(allowableValueDto);
+                        entity.setCanRead(true);
+                        return entity;
+                    })
+                    .collect(Collectors.toList());
+            dto.setAllowableValues(allowableValueEntities);
+        }
+        
+        // Convert dependencies if present
+        if (propertyDescriptor.getDependencies() != null && !propertyDescriptor.getDependencies().isEmpty()) {
+            final Set<ConnectorPropertyDependencyDTO> dependencyDtos = propertyDescriptor.getDependencies().stream()
+                    .map(dependency -> {
+                        final ConnectorPropertyDependencyDTO dependencyDto = new ConnectorPropertyDependencyDTO();
+                        dependencyDto.setPropertyName(dependency.getPropertyName());
+                        dependencyDto.setDependentValues(dependency.getDependentValues());
+                        return dependencyDto;
+                    })
+                    .collect(Collectors.toSet());
+            dto.setDependencies(dependencyDtos);
+        }
+        
+        return dto;
+    }
+
+    /**
+     * Creates a ConfigVerificationResultDTO from the specified ConfigVerificationResult.
+     *
+     * @param result the verification result
+     * @return the DTO
+     */
+    public ConfigVerificationResultDTO createConfigVerificationResultDto(final ConfigVerificationResult result) {
+        final ConfigVerificationResultDTO dto = new ConfigVerificationResultDTO();
+        dto.setExplanation(result.getExplanation());
+        dto.setOutcome(result.getOutcome().name());
+        dto.setVerificationStepName(result.getVerificationStepName());
+        return dto;
+    }
+
 }

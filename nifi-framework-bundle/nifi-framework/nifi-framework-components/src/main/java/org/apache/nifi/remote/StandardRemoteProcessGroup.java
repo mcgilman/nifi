@@ -16,6 +16,7 @@
  */
 package org.apache.nifi.remote;
 
+import jakarta.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.nifi.authorization.Resource;
 import org.apache.nifi.authorization.resource.Authorizable;
@@ -49,8 +50,6 @@ import org.apache.nifi.web.api.dto.PortDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.net.ssl.SSLContext;
-import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -69,7 +68,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.Future;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -79,6 +78,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.net.ssl.SSLContext;
 
 import static java.util.Objects.requireNonNull;
 
@@ -1096,7 +1096,7 @@ public class StandardRemoteProcessGroup implements RemoteProcessGroup {
     }
 
     @Override
-    public Future<?> stopTransmitting() {
+    public CompletableFuture<Void> stopTransmitting() {
         writeLock.lock();
         try {
             verifyCanStopTransmitting();
@@ -1111,13 +1111,15 @@ public class StandardRemoteProcessGroup implements RemoteProcessGroup {
 
             configuredToTransmit.set(false);
 
-            return scheduler.submitFrameworkTask(this::waitForPortShutdown);
+            final CompletableFuture<Void> completableFuture = new CompletableFuture<>();
+            scheduler.submitFrameworkTask(() -> waitForPortShutdown(completableFuture));
+            return completableFuture;
         } finally {
             writeLock.unlock();
         }
     }
 
-    private void waitForPortShutdown() {
+    private void waitForPortShutdown(final CompletableFuture<Void> completableFuture) {
         // Wait for the ports to stop
         try {
             for (final RemoteGroupPort port : getInputPorts()) {
@@ -1143,6 +1145,7 @@ public class StandardRemoteProcessGroup implements RemoteProcessGroup {
             }
         } finally {
             transmitting.set(false);
+            completableFuture.complete(null);
         }
     }
 

@@ -557,6 +557,7 @@ public class FlowController implements ReportingTaskProvider, FlowAnalysisRulePr
         }
 
         lifecycleStateManager = new StandardLifecycleStateManager();
+        reloadComponent = new StandardReloadComponent(this);
         processScheduler = new StandardProcessScheduler(timerDrivenEngineRef.get(), this, stateManagerProvider, this.nifiProperties, lifecycleStateManager);
 
         parameterContextManager = new StandardParameterContextManager();
@@ -642,7 +643,6 @@ public class FlowController implements ReportingTaskProvider, FlowAnalysisRulePr
         this.heartbeatDelaySeconds = (int) FormatUtils.getTimeDuration(nifiProperties.getNodeHeartbeatInterval(), TimeUnit.SECONDS);
 
         this.snippetManager = new SnippetManager();
-        this.reloadComponent = new StandardReloadComponent(this);
 
         final ProcessGroup rootGroup = flowManager.createProcessGroup(ComponentIdGenerator.generateId().toString());
         rootGroup.setName(FlowManager.DEFAULT_ROOT_GROUP_NAME);

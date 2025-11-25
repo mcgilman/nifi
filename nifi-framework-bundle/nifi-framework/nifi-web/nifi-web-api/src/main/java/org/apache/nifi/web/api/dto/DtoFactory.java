@@ -5369,6 +5369,7 @@ public final class DtoFactory {
         dto.setExplanation(result.getExplanation());
         dto.setOutcome(result.getOutcome().name());
         dto.setVerificationStepName(result.getVerificationStepName());
+        dto.setSubject(result.getSubject());
         return dto;
     }
 

@@ -215,6 +215,8 @@ public interface NiFiServiceFacade {
 
     List<ConfigVerificationResultDTO> performConnectorConfigurationStepVerification(String connectorId, String configurationStepName, Map<String, String> properties);
 
+    SearchResultsDTO searchConnector(String connectorId, String query);
+
     // ----------------------------------------
     // Synchronization methods
     // ----------------------------------------

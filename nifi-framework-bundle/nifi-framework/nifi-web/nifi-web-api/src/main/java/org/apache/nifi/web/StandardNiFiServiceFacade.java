@@ -3679,6 +3679,13 @@ public class StandardNiFiServiceFacade implements NiFiServiceFacade {
     }
 
     @Override
+    public SearchResultsDTO searchConnector(final String connectorId, final String query) {
+        final ConnectorNode connectorNode = connectorDAO.getConnector(connectorId);
+        final ProcessGroup managedProcessGroup = connectorNode.getActiveFlowContext().getManagedProcessGroup();
+        return controllerFacade.searchConnector(query, managedProcessGroup);
+    }
+
+    @Override
     public ReportingTaskEntity updateReportingTask(final Revision revision, final ReportingTaskDTO reportingTaskDTO) {
         // get the component, ensure we have access to it, and perform the update request
         final ReportingTaskNode reportingTask = reportingTaskDAO.getReportingTask(reportingTaskDTO.getId());

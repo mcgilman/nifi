@@ -1866,6 +1866,25 @@ public class ControllerFacade implements Authorizable {
         return results;
     }
 
+    /**
+     * Searches within a connector's encapsulated process group for the specified term.
+     *
+     * @param searchLiteral search string specified by the user
+     * @param connectorProcessGroup the connector's managed process group to search within
+     * @return result
+     */
+    public SearchResultsDTO searchConnector(final String searchLiteral, final ProcessGroup connectorProcessGroup) {
+        final SearchResultsDTO results = new SearchResultsDTO();
+        final SearchQuery searchQuery = searchQueryParser.parse(searchLiteral, NiFiUserUtils.getNiFiUser(), connectorProcessGroup, connectorProcessGroup);
+
+        if (!StringUtils.isEmpty(searchQuery.getTerm())) {
+            controllerSearchService.search(searchQuery, results);
+            controllerSearchService.searchParameters(searchQuery, results);
+        }
+
+        return results;
+    }
+
     public void verifyComponentTypes(VersionedProcessGroup versionedFlow) {
         flowController.verifyComponentTypesInSnippet(versionedFlow);
     }

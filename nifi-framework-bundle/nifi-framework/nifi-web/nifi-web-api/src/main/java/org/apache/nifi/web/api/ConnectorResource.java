@@ -754,6 +754,65 @@ public class ConnectorResource extends ApplicationResource {
     }
 
     /**
+     * Performs a search request within the encapsulated process group of this connector.
+     *
+     * @param id The connector id
+     * @param value Search string
+     * @return A searchResultsEntity
+     */
+    @GET
+    @Consumes(MediaType.WILDCARD)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Path("/{id}/search-results")
+    @Operation(
+            summary = "Performs a search against the encapsulated process group of this connector using the specified search term",
+            description = "Only search results from authorized components will be returned.",
+            responses = {
+                    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = org.apache.nifi.web.api.entity.SearchResultsEntity.class))),
+                    @ApiResponse(responseCode = "400", description = "NiFi was unable to complete the request because it was invalid. The request should not be retried without modification."),
+                    @ApiResponse(responseCode = "401", description = "Client could not be authenticated."),
+                    @ApiResponse(responseCode = "403", description = "Client is not authorized to make this request."),
+                    @ApiResponse(responseCode = "404", description = "The specified resource could not be found."),
+                    @ApiResponse(responseCode = "409", description = "The request was valid but NiFi was not in the appropriate state to process it.")
+            },
+            security = {
+                    @SecurityRequirement(name = "Read - /connectors/{uuid}")
+            }
+    )
+    public Response searchConnector(
+            @Parameter(
+                    description = "The connector id.",
+                    required = true
+            )
+            @PathParam("id") final String id,
+            @Parameter(
+                    description = "The search term.",
+                    required = false
+            )
+            @QueryParam("q") @DefaultValue(StringUtils.EMPTY) final String value
+    ) {
+        if (isReplicateRequest()) {
+            return replicate(HttpMethod.GET);
+        }
+
+        // authorize access to the connector
+        serviceFacade.authorizeAccess(lookup -> {
+            final Authorizable connector = lookup.getConnector(id);
+            connector.authorize(authorizer, RequestAction.READ, NiFiUserUtils.getNiFiUser());
+        });
+
+        // search within the connector's encapsulated process group
+        final org.apache.nifi.web.api.dto.search.SearchResultsDTO results = serviceFacade.searchConnector(id, value);
+
+        // create the entity
+        final org.apache.nifi.web.api.entity.SearchResultsEntity entity = new org.apache.nifi.web.api.entity.SearchResultsEntity();
+        entity.setSearchResultsDTO(results);
+
+        // generate the response
+        return noCache(Response.ok(entity)).build();
+    }
+
+    /**
      * Extracts properties from the configuration step into a flat map.
      */
     private Map<String, String> extractPropertiesFromConfigurationStep(final ConfigurationStepConfigurationDTO configurationStep) {

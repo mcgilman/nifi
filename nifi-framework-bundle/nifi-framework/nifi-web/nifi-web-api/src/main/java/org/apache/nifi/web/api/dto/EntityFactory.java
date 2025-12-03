@@ -23,6 +23,7 @@ import org.apache.nifi.web.api.dto.flow.ProcessGroupFlowDTO;
 import org.apache.nifi.web.api.entity.ConfigurationStepEntity;
 import org.apache.nifi.web.api.entity.ConfigurationStepNamesEntity;
 import org.apache.nifi.web.api.entity.ConnectorEntity;
+import org.apache.nifi.web.api.entity.ConnectorPropertyAllowableValuesEntity;
 import org.apache.nifi.web.api.dto.status.ConnectionStatisticsDTO;
 import org.apache.nifi.web.api.dto.status.ConnectionStatisticsSnapshotDTO;
 import org.apache.nifi.web.api.dto.status.ConnectionStatusDTO;
@@ -906,6 +907,15 @@ public final class EntityFactory {
         entity.setConfigurationStep(foundConfigurationStep);
         entity.setParentConnectorId(connectorDto != null ? connectorDto.getId() : null);
         entity.setParentConnectorRevision(parentConnectorRevision);
+        return entity;
+    }
+
+    public ConnectorPropertyAllowableValuesEntity createConnectorPropertyAllowableValuesEntity(final String configurationStepName, final String propertyGroupName, final String propertyName, final List<AllowableValueEntity> allowableValues) {
+        final ConnectorPropertyAllowableValuesEntity entity = new ConnectorPropertyAllowableValuesEntity();
+        entity.setConfigurationStepName(configurationStepName);
+        entity.setPropertyGroupName(propertyGroupName);
+        entity.setPropertyName(propertyName);
+        entity.setAllowableValues(allowableValues);
         return entity;
     }
 }

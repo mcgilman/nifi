@@ -58,6 +58,7 @@ import org.apache.nifi.web.api.entity.ConfigurationStepEntity;
 import org.apache.nifi.web.api.entity.ConfigurationStepNamesEntity;
 import org.apache.nifi.web.api.entity.ConfigurationStepVerificationResultsEntity;
 import org.apache.nifi.web.api.entity.ConnectorEntity;
+import org.apache.nifi.web.api.entity.ConnectorPropertyAllowableValuesEntity;
 import org.apache.nifi.web.api.entity.ConnectorRunStatusEntity;
 import org.apache.nifi.web.api.entity.ProcessGroupFlowEntity;
 import org.apache.nifi.web.api.entity.SearchResultsEntity;
@@ -572,6 +573,62 @@ public class ConnectorResource extends ApplicationResource {
 
         // get the specific configuration step
         final ConfigurationStepEntity entity = serviceFacade.getConnectorConfigurationStep(id, configurationStepName);
+
+        return generateOkResponse(entity).build();
+    }
+
+    /**
+     * Gets the allowable values for a specific property in a connector's configuration step.
+     *
+     * @param id The id of the connector
+     * @param configurationStepName The name of the configuration step
+     * @param propertyGroupName The name of the property group
+     * @param propertyName The name of the property
+     * @param filter Optional filter for the allowable values
+     * @return A ConnectorPropertyAllowableValuesEntity
+     */
+    @GET
+    @Consumes(MediaType.WILDCARD)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Path("/{id}/configuration-steps/{configurationStepName}/property-groups/{propertyGroupName}/properties/{propertyName}/allowable-values")
+    @Operation(
+            summary = "Gets the allowable values for a specific property in a connector's configuration step",
+            responses = {
+                    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = ConnectorPropertyAllowableValuesEntity.class))),
+                    @ApiResponse(responseCode = "400", description = "NiFi was unable to complete the request because it was invalid. The request should not be retried without modification."),
+                    @ApiResponse(responseCode = "401", description = "Client could not be authenticated."),
+                    @ApiResponse(responseCode = "403", description = "Client is not authorized to make this request."),
+                    @ApiResponse(responseCode = "404", description = "The specified resource could not be found."),
+                    @ApiResponse(responseCode = "409", description = "The request was valid but NiFi was not in the appropriate state to process it.")
+            },
+            description = "Gets the allowable values for a specific property that supports dynamic fetching of allowable values. " +
+                    "The filter parameter can be used to narrow down the results based on the property's filtering logic.",
+            security = {
+                    @SecurityRequirement(name = "Read - /connectors/{uuid}")
+            }
+    )
+    public Response getConnectorPropertyAllowableValues(
+            @Parameter(description = "The connector id.", required = true)
+            @PathParam("id") final String id,
+            @Parameter(description = "The configuration step name.", required = true)
+            @PathParam("configurationStepName") final String configurationStepName,
+            @Parameter(description = "The property group name.", required = true)
+            @PathParam("propertyGroupName") final String propertyGroupName,
+            @Parameter(description = "The property name.", required = true)
+            @PathParam("propertyName") final String propertyName,
+            @Parameter(description = "Optional filter to narrow down the allowable values.")
+            @QueryParam("filter") final String filter) {
+
+        // NOTE: fetching allowable values is handled by the node that receives the request and does not need to be replicated
+
+        // authorize access
+        serviceFacade.authorizeAccess(lookup -> {
+            final Authorizable connector = lookup.getConnector(id);
+            connector.authorize(authorizer, RequestAction.READ, NiFiUserUtils.getNiFiUser());
+        });
+
+        // get the allowable values
+        final ConnectorPropertyAllowableValuesEntity entity = serviceFacade.getConnectorPropertyAllowableValues(id, configurationStepName, propertyGroupName, propertyName, filter);
 
         return generateOkResponse(entity).build();
     }

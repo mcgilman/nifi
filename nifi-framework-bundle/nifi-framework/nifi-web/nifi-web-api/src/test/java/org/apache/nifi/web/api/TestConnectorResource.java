@@ -28,9 +28,12 @@ import org.apache.nifi.controller.ScheduledState;
 import org.apache.nifi.util.NiFiProperties;
 import org.apache.nifi.web.NiFiServiceFacade;
 import org.apache.nifi.web.Revision;
+import org.apache.nifi.web.api.dto.AllowableValueDTO;
 import org.apache.nifi.web.api.dto.ConnectorDTO;
 import org.apache.nifi.web.api.dto.RevisionDTO;
+import org.apache.nifi.web.api.entity.AllowableValueEntity;
 import org.apache.nifi.web.api.entity.ConnectorEntity;
+import org.apache.nifi.web.api.entity.ConnectorPropertyAllowableValuesEntity;
 import org.apache.nifi.web.api.entity.ConnectorRunStatusEntity;
 import org.apache.nifi.web.api.request.ClientIdParameter;
 import org.apache.nifi.web.api.request.LongParameter;
@@ -42,6 +45,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.net.URI;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -84,6 +88,9 @@ public class TestConnectorResource {
     private static final String CONNECTOR_ID = "test-connector-id";
     private static final String CONNECTOR_NAME = "Test Connector";
     private static final String CONNECTOR_TYPE = "TestConnectorType";
+    private static final String CONFIGURATION_STEP_NAME = "test-step";
+    private static final String PROPERTY_GROUP_NAME = "test-group";
+    private static final String PROPERTY_NAME = "test-property";
 
     @BeforeEach
     public void setUp() throws Exception {
@@ -275,6 +282,50 @@ public class TestConnectorResource {
         verify(serviceFacade, never()).scheduleConnector(any(Revision.class), anyString(), any(ScheduledState.class));
     }
 
+    @Test
+    public void testGetConnectorPropertyAllowableValues() {
+        final ConnectorPropertyAllowableValuesEntity responseEntity = createConnectorPropertyAllowableValuesEntity();
+
+        when(serviceFacade.getConnectorPropertyAllowableValues(CONNECTOR_ID, CONFIGURATION_STEP_NAME, PROPERTY_GROUP_NAME, PROPERTY_NAME, null))
+            .thenReturn(responseEntity);
+
+        try (Response response = connectorResource.getConnectorPropertyAllowableValues(CONNECTOR_ID, CONFIGURATION_STEP_NAME, PROPERTY_GROUP_NAME, PROPERTY_NAME, null)) {
+            assertEquals(200, response.getStatus());
+            assertEquals(responseEntity, response.getEntity());
+        }
+
+        verify(serviceFacade).authorizeAccess(any(AuthorizeAccess.class));
+        verify(serviceFacade).getConnectorPropertyAllowableValues(CONNECTOR_ID, CONFIGURATION_STEP_NAME, PROPERTY_GROUP_NAME, PROPERTY_NAME, null);
+    }
+
+    @Test
+    public void testGetConnectorPropertyAllowableValuesWithFilter() {
+        final String filter = "test-filter";
+        final ConnectorPropertyAllowableValuesEntity responseEntity = createConnectorPropertyAllowableValuesEntity();
+
+        when(serviceFacade.getConnectorPropertyAllowableValues(CONNECTOR_ID, CONFIGURATION_STEP_NAME, PROPERTY_GROUP_NAME, PROPERTY_NAME, filter))
+            .thenReturn(responseEntity);
+
+        try (Response response = connectorResource.getConnectorPropertyAllowableValues(CONNECTOR_ID, CONFIGURATION_STEP_NAME, PROPERTY_GROUP_NAME, PROPERTY_NAME, filter)) {
+            assertEquals(200, response.getStatus());
+            assertEquals(responseEntity, response.getEntity());
+        }
+
+        verify(serviceFacade).authorizeAccess(any(AuthorizeAccess.class));
+        verify(serviceFacade).getConnectorPropertyAllowableValues(CONNECTOR_ID, CONFIGURATION_STEP_NAME, PROPERTY_GROUP_NAME, PROPERTY_NAME, filter);
+    }
+
+    @Test
+    public void testGetConnectorPropertyAllowableValuesNotAuthorized() {
+        doThrow(AccessDeniedException.class).when(serviceFacade).authorizeAccess(any(AuthorizeAccess.class));
+
+        assertThrows(AccessDeniedException.class, () -> 
+            connectorResource.getConnectorPropertyAllowableValues(CONNECTOR_ID, CONFIGURATION_STEP_NAME, PROPERTY_GROUP_NAME, PROPERTY_NAME, null));
+
+        verify(serviceFacade).authorizeAccess(any(AuthorizeAccess.class));
+        verify(serviceFacade, never()).getConnectorPropertyAllowableValues(anyString(), anyString(), anyString(), anyString(), any());
+    }
+
     private ConnectorEntity createConnectorEntity() {
         final ConnectorEntity entity = new ConnectorEntity();
         
@@ -301,6 +352,35 @@ public class TestConnectorResource {
         revision.setVersion(1L);
         revision.setClientId("client-id");
         entity.setRevision(revision);
+
+        return entity;
+    }
+
+    private ConnectorPropertyAllowableValuesEntity createConnectorPropertyAllowableValuesEntity() {
+        final ConnectorPropertyAllowableValuesEntity entity = new ConnectorPropertyAllowableValuesEntity();
+        entity.setConfigurationStepName(CONFIGURATION_STEP_NAME);
+        entity.setPropertyGroupName(PROPERTY_GROUP_NAME);
+        entity.setPropertyName(PROPERTY_NAME);
+
+        final AllowableValueDTO allowableValueDto1 = new AllowableValueDTO();
+        allowableValueDto1.setValue("value1");
+        allowableValueDto1.setDisplayName("Value 1");
+        allowableValueDto1.setDescription("First allowable value");
+
+        final AllowableValueEntity allowableValueEntity1 = new AllowableValueEntity();
+        allowableValueEntity1.setAllowableValue(allowableValueDto1);
+        allowableValueEntity1.setCanRead(true);
+
+        final AllowableValueDTO allowableValueDto2 = new AllowableValueDTO();
+        allowableValueDto2.setValue("value2");
+        allowableValueDto2.setDisplayName("Value 2");
+        allowableValueDto2.setDescription("Second allowable value");
+
+        final AllowableValueEntity allowableValueEntity2 = new AllowableValueEntity();
+        allowableValueEntity2.setAllowableValue(allowableValueDto2);
+        allowableValueEntity2.setCanRead(true);
+
+        entity.setAllowableValues(List.of(allowableValueEntity1, allowableValueEntity2));
 
         return entity;
     }

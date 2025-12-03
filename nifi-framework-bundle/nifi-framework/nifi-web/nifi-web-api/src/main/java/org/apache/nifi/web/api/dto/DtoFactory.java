@@ -5387,6 +5387,24 @@ public final class DtoFactory {
     }
 
     /**
+     * Creates an AllowableValueDTO from the specified AllowableValue.
+     *
+     * @param allowableValue the allowable value
+     * @return the DTO
+     */
+    public AllowableValueDTO createAllowableValueDto(final AllowableValue allowableValue) {
+        if (allowableValue == null) {
+            return null;
+        }
+
+        final AllowableValueDTO dto = new AllowableValueDTO();
+        dto.setValue(allowableValue.getValue());
+        dto.setDisplayName(allowableValue.getDisplayName());
+        dto.setDescription(allowableValue.getDescription());
+        return dto;
+    }
+
+    /**
      * Creates a ConfigVerificationResultDTO from the specified ConfigVerificationResult.
      *
      * @param result the verification result

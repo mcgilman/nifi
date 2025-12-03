@@ -71,6 +71,7 @@ import org.apache.nifi.cluster.event.NodeEvent;
 import org.apache.nifi.cluster.manager.exception.IllegalNodeDeletionException;
 import org.apache.nifi.cluster.manager.exception.UnknownNodeException;
 import org.apache.nifi.cluster.protocol.NodeIdentifier;
+import org.apache.nifi.components.AllowableValue;
 import org.apache.nifi.components.ConfigVerificationResult;
 import org.apache.nifi.components.ConfigurableComponent;
 import org.apache.nifi.components.PropertyDescriptor;
@@ -326,6 +327,8 @@ import org.apache.nifi.web.api.dto.status.StatusHistoryDTO;
 import org.apache.nifi.web.api.dto.status.StatusSnapshotDTO;
 import org.apache.nifi.web.api.entity.AccessPolicyEntity;
 import org.apache.nifi.web.api.entity.AccessPolicySummaryEntity;
+import org.apache.nifi.web.api.entity.AllowableValueEntity;
+import org.apache.nifi.web.api.entity.ConnectorPropertyAllowableValuesEntity;
 import org.apache.nifi.web.api.entity.ActionEntity;
 import org.apache.nifi.web.api.entity.ActivateControllerServicesEntity;
 import org.apache.nifi.web.api.entity.AffectedComponentEntity;
@@ -3669,6 +3672,17 @@ public class StandardNiFiServiceFacade implements NiFiServiceFacade {
         final ConnectorNode connectorNode = connectorDAO.getConnector(connectorId);
         final ProcessGroup managedProcessGroup = connectorNode.getActiveFlowContext().getManagedProcessGroup();
         return controllerFacade.searchConnector(query, managedProcessGroup);
+    }
+
+    @Override
+    public ConnectorPropertyAllowableValuesEntity getConnectorPropertyAllowableValues(final String connectorId, final String stepName, final String groupName, final String propertyName, final String filter) {
+        final List<AllowableValue> allowableValues = connectorDAO.fetchAllowableValues(connectorId, stepName, groupName, propertyName, filter);
+
+        final List<AllowableValueEntity> allowableValueEntities = allowableValues.stream()
+                .map(av -> entityFactory.createAllowableValueEntity(dtoFactory.createAllowableValueDto(av), true))
+                .collect(Collectors.toList());
+
+        return entityFactory.createConnectorPropertyAllowableValuesEntity(stepName, groupName, propertyName, allowableValueEntities);
     }
 
     @Override

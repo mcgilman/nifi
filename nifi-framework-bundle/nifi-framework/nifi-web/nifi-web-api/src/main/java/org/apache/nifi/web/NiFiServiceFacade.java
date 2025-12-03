@@ -151,6 +151,7 @@ import org.apache.nifi.web.api.entity.RemoteProcessGroupPortEntity;
 import org.apache.nifi.web.api.entity.RemoteProcessGroupStatusEntity;
 import org.apache.nifi.web.api.entity.ReportingTaskEntity;
 import org.apache.nifi.web.api.entity.ConnectorEntity;
+import org.apache.nifi.web.api.entity.ConnectorPropertyAllowableValuesEntity;
 import org.apache.nifi.web.api.entity.ConfigurationStepEntity;
 import org.apache.nifi.web.api.entity.ConfigurationStepNamesEntity;
 import org.apache.nifi.web.api.entity.ScheduleComponentsEntity;
@@ -220,6 +221,8 @@ public interface NiFiServiceFacade {
     List<ConfigVerificationResultDTO> performConnectorConfigurationStepVerification(String connectorId, String configurationStepName, Map<String, String> properties);
 
     SearchResultsDTO searchConnector(String connectorId, String query);
+
+    ConnectorPropertyAllowableValuesEntity getConnectorPropertyAllowableValues(String connectorId, String stepName, String groupName, String propertyName, String filter);
 
     // ----------------------------------------
     // Synchronization methods

@@ -17,6 +17,7 @@
 package org.apache.nifi.web.dao.impl;
 
 import org.apache.nifi.bundle.BundleCoordinate;
+import org.apache.nifi.components.AllowableValue;
 import org.apache.nifi.components.ConfigVerificationResult;
 import org.apache.nifi.components.connector.ConnectorNode;
 import org.apache.nifi.components.connector.ConnectorRepository;
@@ -186,6 +187,16 @@ public class StandardConnectorDAO implements ConnectorDAO {
 
         // Call verifyConfigurationStep on the connector node and return the results
         return connector.verifyConfigurationStep(configurationStepName, propertyGroupConfigurations);
+    }
+
+    @Override
+    public List<AllowableValue> fetchAllowableValues(final String id, final String stepName, final String groupName, final String propertyName, final String filter) {
+        final ConnectorNode connector = getConnector(id);
+        if (filter == null || filter.isEmpty()) {
+            return connector.fetchAllowableValues(stepName, groupName, propertyName);
+        } else {
+            return connector.fetchAllowableValues(stepName, groupName, propertyName, filter);
+        }
     }
 }
 

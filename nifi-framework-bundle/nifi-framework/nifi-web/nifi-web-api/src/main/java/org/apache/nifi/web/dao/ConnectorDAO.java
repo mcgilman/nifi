@@ -17,6 +17,7 @@
 package org.apache.nifi.web.dao;
 
 import org.apache.nifi.bundle.BundleCoordinate;
+import org.apache.nifi.components.AllowableValue;
 import org.apache.nifi.components.ConfigVerificationResult;
 import org.apache.nifi.components.connector.ConnectorNode;
 import org.apache.nifi.web.api.dto.ConfigurationStepConfigurationDTO;
@@ -51,6 +52,8 @@ public interface ConnectorDAO {
     void verifyCanVerifyConfigurationStep(String id, String configurationStepName);
 
     List<ConfigVerificationResult> verifyConfigurationStep(String id, String configurationStepName, Map<String, String> properties);
+
+    List<AllowableValue> fetchAllowableValues(String id, String stepName, String groupName, String propertyName, String filter);
 }
 
 

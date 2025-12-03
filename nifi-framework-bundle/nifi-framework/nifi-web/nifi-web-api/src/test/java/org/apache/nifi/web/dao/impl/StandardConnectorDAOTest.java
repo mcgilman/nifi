@@ -16,6 +16,7 @@
  */
 package org.apache.nifi.web.dao.impl;
 
+import org.apache.nifi.components.AllowableValue;
 import org.apache.nifi.components.connector.ConnectorNode;
 import org.apache.nifi.components.connector.ConnectorRepository;
 import org.apache.nifi.components.connector.FlowUpdateException;
@@ -27,6 +28,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -51,6 +54,9 @@ class StandardConnectorDAOTest {
     private ConnectorNode connectorNode;
 
     private static final String CONNECTOR_ID = "test-connector-id";
+    private static final String STEP_NAME = "test-step";
+    private static final String GROUP_NAME = "test-group";
+    private static final String PROPERTY_NAME = "test-property";
 
     @BeforeEach
     void setUp() {
@@ -143,6 +149,64 @@ class StandardConnectorDAOTest {
         final ConnectorNode result = connectorDAO.getConnector(CONNECTOR_ID);
 
         assertEquals(connectorNode, result);
+        verify(connectorRepository).getConnector(CONNECTOR_ID);
+    }
+
+    @Test
+    void testFetchAllowableValuesWithoutFilter() {
+        final List<AllowableValue> expectedValues = List.of(
+            new AllowableValue("value1", "Value 1", "First value"),
+            new AllowableValue("value2", "Value 2", "Second value")
+        );
+        when(connectorRepository.getConnector(CONNECTOR_ID)).thenReturn(connectorNode);
+        when(connectorNode.fetchAllowableValues(STEP_NAME, GROUP_NAME, PROPERTY_NAME)).thenReturn(expectedValues);
+
+        final List<AllowableValue> result = connectorDAO.fetchAllowableValues(CONNECTOR_ID, STEP_NAME, GROUP_NAME, PROPERTY_NAME, null);
+
+        assertEquals(expectedValues, result);
+        verify(connectorNode).fetchAllowableValues(STEP_NAME, GROUP_NAME, PROPERTY_NAME);
+        verify(connectorNode, never()).fetchAllowableValues(any(), any(), any(), any());
+    }
+
+    @Test
+    void testFetchAllowableValuesWithEmptyFilter() {
+        final List<AllowableValue> expectedValues = List.of(
+            new AllowableValue("value1", "Value 1", "First value")
+        );
+        when(connectorRepository.getConnector(CONNECTOR_ID)).thenReturn(connectorNode);
+        when(connectorNode.fetchAllowableValues(STEP_NAME, GROUP_NAME, PROPERTY_NAME)).thenReturn(expectedValues);
+
+        final List<AllowableValue> result = connectorDAO.fetchAllowableValues(CONNECTOR_ID, STEP_NAME, GROUP_NAME, PROPERTY_NAME, "");
+
+        assertEquals(expectedValues, result);
+        verify(connectorNode).fetchAllowableValues(STEP_NAME, GROUP_NAME, PROPERTY_NAME);
+        verify(connectorNode, never()).fetchAllowableValues(any(), any(), any(), any());
+    }
+
+    @Test
+    void testFetchAllowableValuesWithFilter() {
+        final String filter = "test-filter";
+        final List<AllowableValue> expectedValues = List.of(
+            new AllowableValue("filtered-value", "Filtered Value", "Filtered result")
+        );
+        when(connectorRepository.getConnector(CONNECTOR_ID)).thenReturn(connectorNode);
+        when(connectorNode.fetchAllowableValues(STEP_NAME, GROUP_NAME, PROPERTY_NAME, filter)).thenReturn(expectedValues);
+
+        final List<AllowableValue> result = connectorDAO.fetchAllowableValues(CONNECTOR_ID, STEP_NAME, GROUP_NAME, PROPERTY_NAME, filter);
+
+        assertEquals(expectedValues, result);
+        verify(connectorNode).fetchAllowableValues(STEP_NAME, GROUP_NAME, PROPERTY_NAME, filter);
+        verify(connectorNode, never()).fetchAllowableValues(STEP_NAME, GROUP_NAME, PROPERTY_NAME);
+    }
+
+    @Test
+    void testFetchAllowableValuesWithNonExistentConnector() {
+        when(connectorRepository.getConnector(CONNECTOR_ID)).thenReturn(null);
+
+        assertThrows(ResourceNotFoundException.class, () ->
+            connectorDAO.fetchAllowableValues(CONNECTOR_ID, STEP_NAME, GROUP_NAME, PROPERTY_NAME, null)
+        );
+
         verify(connectorRepository).getConnector(CONNECTOR_ID);
     }
 }

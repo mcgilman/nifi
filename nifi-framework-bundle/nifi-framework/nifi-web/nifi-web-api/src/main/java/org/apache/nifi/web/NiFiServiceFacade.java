@@ -216,6 +216,8 @@ public interface NiFiServiceFacade {
 
     ProcessGroupFlowEntity getConnectorFlow(String id, boolean uiOnly);
 
+    ProcessGroupStatusEntity getConnectorProcessGroupStatus(String id, Boolean recursive);
+
     void verifyCanVerifyConnectorConfigurationStep(String connectorId, String configurationStepName);
 
     List<ConfigVerificationResultDTO> performConnectorConfigurationStepVerification(String connectorId, String configurationStepName, Map<String, String> properties);

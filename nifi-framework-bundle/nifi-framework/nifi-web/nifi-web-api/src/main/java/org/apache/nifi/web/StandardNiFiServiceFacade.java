@@ -3655,6 +3655,28 @@ public class StandardNiFiServiceFacade implements NiFiServiceFacade {
     }
 
     @Override
+    public ProcessGroupStatusEntity getConnectorProcessGroupStatus(final String id, final Boolean recursive) {
+        final ConnectorNode connectorNode = connectorDAO.getConnector(id);
+        final ProcessGroup managedProcessGroup = connectorNode.getActiveFlowContext().getManagedProcessGroup();
+        final String processGroupId = managedProcessGroup.getIdentifier();
+
+        final PermissionsDTO permissions = dtoFactory.createPermissionsDto(connectorNode);
+        final ProcessGroupStatusDTO dto = dtoFactory.createProcessGroupStatusDto(managedProcessGroup, controllerFacade.getProcessGroupStatus(processGroupId));
+
+        // prune the response as necessary
+        if (!Boolean.TRUE.equals(recursive)) {
+            pruneChildGroups(dto.getAggregateSnapshot());
+            if (dto.getNodeSnapshots() != null) {
+                for (final NodeProcessGroupStatusSnapshotDTO nodeSnapshot : dto.getNodeSnapshots()) {
+                    pruneChildGroups(nodeSnapshot.getStatusSnapshot());
+                }
+            }
+        }
+
+        return entityFactory.createProcessGroupStatusEntity(dto, permissions);
+    }
+
+    @Override
     public void verifyCanVerifyConnectorConfigurationStep(final String connectorId, final String configurationStepName) {
         connectorDAO.verifyCanVerifyConfigurationStep(connectorId, configurationStepName);
     }

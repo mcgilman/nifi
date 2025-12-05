@@ -39,6 +39,7 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.nifi.cluster.manager.NodeResponse;
 import org.apache.nifi.authorization.Authorizer;
 import org.apache.nifi.authorization.RequestAction;
 import org.apache.nifi.authorization.resource.Authorizable;
@@ -65,6 +66,7 @@ import org.apache.nifi.web.api.entity.ConnectorEntity;
 import org.apache.nifi.web.api.entity.ConnectorPropertyAllowableValuesEntity;
 import org.apache.nifi.web.api.entity.ConnectorRunStatusEntity;
 import org.apache.nifi.web.api.entity.ProcessGroupFlowEntity;
+import org.apache.nifi.web.api.entity.ProcessGroupStatusEntity;
 import org.apache.nifi.web.api.entity.SearchResultsEntity;
 import org.apache.nifi.web.api.request.ClientIdParameter;
 import org.apache.nifi.web.api.request.LongParameter;
@@ -1078,6 +1080,88 @@ public class ConnectorResource extends ApplicationResource {
         // get the flow for the connector's managed process group
         final ProcessGroupFlowEntity entity = serviceFacade.getConnectorFlow(id, uiOnly);
         flowResource.populateRemainingFlowContent(entity.getProcessGroupFlow());
+        return generateOkResponse(entity).build();
+    }
+
+    /**
+     * Retrieves the status for the process group managed by the specified connector.
+     *
+     * @param id The id of the connector
+     * @param recursive Optional recursive flag that defaults to false. If set to true, all descendant groups and the status of their content will be included.
+     * @param nodewise Whether to include breakdown per node
+     * @param clusterNodeId The id of a specific node to get status from
+     * @return A processGroupStatusEntity
+     * @throws InterruptedException if interrupted
+     */
+    @GET
+    @Consumes(MediaType.WILDCARD)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Path("/{id}/status")
+    @Operation(
+            summary = "Gets the status for the process group managed by a connector",
+            responses = {
+                    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = ProcessGroupStatusEntity.class))),
+                    @ApiResponse(responseCode = "400", description = "NiFi was unable to complete the request because it was invalid. The request should not be retried without modification."),
+                    @ApiResponse(responseCode = "401", description = "Client could not be authenticated."),
+                    @ApiResponse(responseCode = "403", description = "Client is not authorized to make this request."),
+                    @ApiResponse(responseCode = "404", description = "The specified resource could not be found."),
+                    @ApiResponse(responseCode = "409", description = "The request was valid but NiFi was not in the appropriate state to process it.")
+            },
+            security = {
+                    @SecurityRequirement(name = "Read - /connectors/{uuid}")
+            },
+            description = "Returns the status for the process group managed by the specified connector. The status includes status for all descendent components. " +
+                    "When invoked with recursive set to true, it will return the current status of every component in the connector's encapsulated flow."
+    )
+    public Response getConnectorStatus(
+            @Parameter(
+                    description = "The connector id.",
+                    required = true
+            )
+            @PathParam("id") final String id,
+            @Parameter(
+                    description = "Whether all descendant groups and the status of their content will be included. Optional, defaults to false"
+            )
+            @QueryParam("recursive") @DefaultValue("false") final Boolean recursive,
+            @Parameter(
+                    description = "Whether or not to include the breakdown per node. Optional, defaults to false"
+            )
+            @QueryParam("nodewise") @DefaultValue("false") final Boolean nodewise,
+            @Parameter(
+                    description = "The id of the node where to get the status."
+            )
+            @QueryParam("clusterNodeId") final String clusterNodeId) throws InterruptedException {
+
+        // ensure a valid request
+        if (Boolean.TRUE.equals(nodewise) && clusterNodeId != null) {
+            throw new IllegalArgumentException("Nodewise requests cannot be directed at a specific node.");
+        }
+
+        if (isReplicateRequest()) {
+            // determine where this request should be sent
+            if (clusterNodeId == null) {
+                final NodeResponse nodeResponse = replicateNodeResponse(HttpMethod.GET);
+                final ProcessGroupStatusEntity entity = (ProcessGroupStatusEntity) nodeResponse.getUpdatedEntity();
+
+                // ensure there is an updated entity (result of merging) and prune the response as necessary
+                if (entity != null && !nodewise) {
+                    entity.getProcessGroupStatus().setNodeSnapshots(null);
+                }
+
+                return nodeResponse.getResponse();
+            } else {
+                return replicate(HttpMethod.GET, clusterNodeId);
+            }
+        }
+
+        // authorize access to the connector
+        serviceFacade.authorizeAccess(lookup -> {
+            final Authorizable connector = lookup.getConnector(id);
+            connector.authorize(authorizer, RequestAction.READ, NiFiUserUtils.getNiFiUser());
+        });
+
+        // get the status for the connector's managed process group
+        final ProcessGroupStatusEntity entity = serviceFacade.getConnectorProcessGroupStatus(id, recursive);
         return generateOkResponse(entity).build();
     }
 

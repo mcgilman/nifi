@@ -46,9 +46,13 @@ import org.apache.nifi.authorization.resource.OperationAuthorizable;
 import org.apache.nifi.authorization.user.NiFiUser;
 import org.apache.nifi.authorization.user.NiFiUserUtils;
 import org.apache.nifi.controller.ScheduledState;
+import org.apache.nifi.ui.extension.UiExtension;
+import org.apache.nifi.ui.extension.UiExtensionMapping;
 import org.apache.nifi.web.NiFiServiceFacade;
 import org.apache.nifi.web.Revision;
+import org.apache.nifi.web.UiExtensionType;
 import org.apache.nifi.web.api.dto.ConfigVerificationResultDTO;
+import org.apache.nifi.web.api.dto.BundleDTO;
 import org.apache.nifi.web.api.dto.ConfigurationStepConfigurationDTO;
 import org.apache.nifi.web.api.dto.ConnectorDTO;
 import org.apache.nifi.web.api.dto.ConnectorValueReferenceDTO;
@@ -118,12 +122,58 @@ public class ConnectorResource extends ApplicationResource {
     }
 
     /**
-     * Populates the uri for the specified connector.
+     * Populates the uri for the specified connector including custom UI information.
      */
     public ConnectorDTO populateRemainingConnectorContent(final ConnectorDTO connector) {
-        // populate remaining content
-        // Note: ConnectorDTO inherits uri from ComponentDTO
+        final BundleDTO bundle = connector.getBundle();
+        if (bundle == null) {
+            return connector;
+        }
+
+        // see if this connector has any ui extensions
+        final UiExtensionMapping uiExtensionMapping = (UiExtensionMapping) servletContext.getAttribute("nifi-ui-extensions");
+        if (uiExtensionMapping.hasUiExtension(connector.getType(), bundle.getGroup(), bundle.getArtifact(), bundle.getVersion())) {
+            final List<UiExtension> uiExtensions = uiExtensionMapping.getUiExtension(connector.getType(), bundle.getGroup(), bundle.getArtifact(), bundle.getVersion());
+            for (final UiExtension uiExtension : uiExtensions) {
+                if (UiExtensionType.Connector.equals(uiExtension.getExtensionType())) {
+                    final String contextPath = uiExtension.getContextPath();
+                    final Map<String, String> routes = uiExtension.getSupportedRoutes();
+
+                    if (routes != null) {
+                        final String configurationPath = routes.get("configuration");
+                        if (configurationPath != null) {
+                            connector.setConfigurationUrl(buildCustomUiUrl(contextPath, configurationPath));
+                        }
+
+                        final String detailsPath = routes.get("details");
+                        if (detailsPath != null) {
+                            connector.setDetailsUrl(buildCustomUiUrl(contextPath, detailsPath));
+                        }
+                    }
+                }
+            }
+        }
+
         return connector;
+    }
+
+    /**
+     * Builds a custom UI URL from the context path and route path.
+     * Handles both hash-based routing (path starts with #) and location-based routing.
+     *
+     * @param contextPath the context path of the custom UI
+     * @param routePath the route path (e.g., "#/wizard" for hash-based or "/wizard" for location-based)
+     * @return the full URL for the custom UI route
+     */
+    private String buildCustomUiUrl(final String contextPath, final String routePath) {
+        final String baseUrl = generateExternalUiUri(contextPath);
+        if (routePath.startsWith("#")) {
+            // Hash-based routing: /context-path/#/route
+            return baseUrl + "/" + routePath;
+        } else {
+            // Location-based routing: /context-path/route
+            return baseUrl + routePath;
+        }
     }
 
     /**

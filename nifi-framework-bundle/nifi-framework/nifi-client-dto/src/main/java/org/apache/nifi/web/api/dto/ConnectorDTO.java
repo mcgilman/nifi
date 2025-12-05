@@ -32,10 +32,13 @@ public class ConnectorDTO extends ComponentDTO {
     private String state; // RUNNING, STOPPED, DISABLED
     private ConnectorConfigurationDTO activeConfiguration;
     private ConnectorConfigurationDTO workingConfiguration;
-    
+
     private Collection<String> validationErrors;
     private String validationStatus;
     private Boolean multipleVersionsAvailable;
+
+    private String configurationUrl;
+    private String detailsUrl;
 
     @Schema(description = "The name of the Connector.")
     public String getName() {
@@ -116,5 +119,23 @@ public class ConnectorDTO extends ComponentDTO {
 
     public void setMultipleVersionsAvailable(final Boolean multipleVersionsAvailable) {
         this.multipleVersionsAvailable = multipleVersionsAvailable;
+    }
+
+    @Schema(description = "The URL for this connector's configuration/wizard custom UI, if applicable.")
+    public String getConfigurationUrl() {
+        return configurationUrl;
+    }
+
+    public void setConfigurationUrl(final String configurationUrl) {
+        this.configurationUrl = configurationUrl;
+    }
+
+    @Schema(description = "The URL for this connector's details custom UI, if applicable.")
+    public String getDetailsUrl() {
+        return detailsUrl;
+    }
+
+    public void setDetailsUrl(final String detailsUrl) {
+        this.detailsUrl = detailsUrl;
     }
 }

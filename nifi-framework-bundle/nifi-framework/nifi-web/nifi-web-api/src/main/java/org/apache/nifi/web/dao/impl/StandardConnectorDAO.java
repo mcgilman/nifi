@@ -19,11 +19,14 @@ package org.apache.nifi.web.dao.impl;
 import org.apache.nifi.bundle.BundleCoordinate;
 import org.apache.nifi.components.AllowableValue;
 import org.apache.nifi.components.ConfigVerificationResult;
+import org.apache.nifi.components.connector.AssetReference;
 import org.apache.nifi.components.connector.ConnectorNode;
 import org.apache.nifi.components.connector.ConnectorRepository;
 import org.apache.nifi.components.connector.ConnectorValueReference;
 import org.apache.nifi.components.connector.ConnectorValueType;
 import org.apache.nifi.components.connector.PropertyGroupConfiguration;
+import org.apache.nifi.components.connector.SecretReference;
+import org.apache.nifi.components.connector.StringLiteralValue;
 import org.apache.nifi.web.api.dto.ConfigurationStepConfigurationDTO;
 import org.apache.nifi.web.api.dto.ConnectorValueReferenceDTO;
 import org.apache.nifi.web.api.dto.PropertyGroupConfigurationDTO;
@@ -149,7 +152,11 @@ public class StandardConnectorDAO implements ConnectorDAO {
             return null;
         }
         final ConnectorValueType valueType = dto.getValueType() != null ? ConnectorValueType.valueOf(dto.getValueType()) : ConnectorValueType.STRING_LITERAL;
-        return new ConnectorValueReference(dto.getValue(), valueType);
+        return switch (valueType) {
+            case STRING_LITERAL -> new StringLiteralValue(dto.getValue());
+            case ASSET_REFERENCE -> new AssetReference(dto.getAssetIdentifier());
+            case SECRET_REFERENCE -> new SecretReference(dto.getSecretProviderId(), dto.getSecretName());
+        };
     }
 
     @Override
@@ -178,7 +185,7 @@ public class StandardConnectorDAO implements ConnectorDAO {
             // Convert string properties to ConnectorValueReference map
             final Map<String, ConnectorValueReference> valueReferences = new HashMap<>();
             for (final Map.Entry<String, String> entry : properties.entrySet()) {
-                valueReferences.put(entry.getKey(), new ConnectorValueReference(entry.getValue(), ConnectorValueType.STRING_LITERAL));
+                valueReferences.put(entry.getKey(), new StringLiteralValue(entry.getValue()));
             }
             // For verification, we create a single property group with all properties
             final PropertyGroupConfiguration propertyGroupConfiguration = new PropertyGroupConfiguration(configurationStepName, valueReferences);

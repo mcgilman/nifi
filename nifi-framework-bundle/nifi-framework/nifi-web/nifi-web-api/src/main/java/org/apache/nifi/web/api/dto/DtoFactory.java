@@ -71,6 +71,7 @@ import org.apache.nifi.components.state.StateMap;
 import org.apache.nifi.components.validation.ValidationState;
 import org.apache.nifi.components.validation.ValidationStatus;
 import org.apache.nifi.connectable.Connectable;
+import org.apache.nifi.components.connector.AssetReference;
 import org.apache.nifi.components.connector.ConfigurationStep;
 import org.apache.nifi.components.connector.ConfigurationStepConfiguration;
 import org.apache.nifi.components.connector.ConnectorConfiguration;
@@ -80,6 +81,8 @@ import org.apache.nifi.components.connector.ConnectorPropertyGroup;
 import org.apache.nifi.components.connector.ConnectorValueReference;
 import org.apache.nifi.components.connector.FrameworkFlowContext;
 import org.apache.nifi.components.connector.PropertyGroupConfiguration;
+import org.apache.nifi.components.connector.SecretReference;
+import org.apache.nifi.components.connector.StringLiteralValue;
 import org.apache.nifi.connectable.ConnectableType;
 import org.apache.nifi.connectable.Connection;
 import org.apache.nifi.connectable.Funnel;
@@ -5334,8 +5337,17 @@ public final class DtoFactory {
         }
 
         final ConnectorValueReferenceDTO dto = new ConnectorValueReferenceDTO();
-        dto.setValue(valueReference.value());
-        dto.setValueType(valueReference.valueType() != null ? valueReference.valueType().name() : null);
+        dto.setValueType(valueReference.getValueType() != null ? valueReference.getValueType().name() : null);
+
+        switch (valueReference) {
+            case StringLiteralValue stringLiteral -> dto.setValue(stringLiteral.getValue());
+            case AssetReference assetRef -> dto.setAssetIdentifier(assetRef.getAssetIdentifier());
+            case SecretReference secretRef -> {
+                dto.setSecretProviderId(secretRef.getProviderId());
+                dto.setSecretName(secretRef.getSecretName());
+            }
+        }
+
         return dto;
     }
 

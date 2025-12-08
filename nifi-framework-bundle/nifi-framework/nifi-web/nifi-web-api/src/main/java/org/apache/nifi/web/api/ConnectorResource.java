@@ -61,23 +61,33 @@ import org.apache.nifi.web.api.dto.PropertyGroupConfigurationDTO;
 import org.apache.nifi.web.api.dto.search.SearchResultsDTO;
 import org.apache.nifi.web.api.entity.ConfigurationStepEntity;
 import org.apache.nifi.web.api.entity.ConfigurationStepNamesEntity;
-import org.apache.nifi.web.api.entity.ConfigurationStepVerificationResultsEntity;
 import org.apache.nifi.web.api.entity.ConnectorEntity;
 import org.apache.nifi.web.api.entity.ConnectorPropertyAllowableValuesEntity;
 import org.apache.nifi.web.api.entity.ConnectorRunStatusEntity;
 import org.apache.nifi.web.api.entity.ProcessGroupFlowEntity;
 import org.apache.nifi.web.api.entity.ProcessGroupStatusEntity;
 import org.apache.nifi.web.api.entity.SearchResultsEntity;
+import org.apache.nifi.web.api.concurrent.AsyncRequestManager;
+import org.apache.nifi.web.api.concurrent.AsynchronousWebRequest;
+import org.apache.nifi.web.api.concurrent.RequestManager;
+import org.apache.nifi.web.api.concurrent.StandardAsynchronousWebRequest;
+import org.apache.nifi.web.api.concurrent.StandardUpdateStep;
+import org.apache.nifi.web.api.concurrent.UpdateStep;
+import org.apache.nifi.web.api.dto.VerifyConnectorConfigStepRequestDTO;
+import org.apache.nifi.web.api.entity.VerifyConnectorConfigStepRequestEntity;
 import org.apache.nifi.web.api.request.ClientIdParameter;
 import org.apache.nifi.web.api.request.LongParameter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 
 import java.net.URI;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * RESTful endpoint for managing a Connector.
@@ -87,9 +97,14 @@ import java.util.Set;
 @Tag(name = "Connectors")
 public class ConnectorResource extends ApplicationResource {
 
+    private static final Logger logger = LoggerFactory.getLogger(ConnectorResource.class);
+    private static final String VERIFICATION_REQUEST_TYPE = "verification-request";
+
     private NiFiServiceFacade serviceFacade;
     private Authorizer authorizer;
     private FlowResource flowResource;
+    private final RequestManager<VerifyConnectorConfigStepRequestEntity, List<ConfigVerificationResultDTO>> configVerificationRequestManager =
+            new AsyncRequestManager<>(100, 1L, "Connector Configuration Step Verification");
 
     @Context
     private ServletContext servletContext;
@@ -783,12 +798,14 @@ public class ConnectorResource extends ApplicationResource {
     }
 
     /**
-     * Performs verification of a specific configuration step for a connector.
+     * Submits a request to perform verification of a specific configuration step for a connector.
+     * This is an asynchronous operation that will return immediately with a request ID that can be
+     * used to poll for the results.
      *
      * @param id The id of the connector
      * @param configurationStepName The name of the configuration step to verify
-     * @param requestEntity The configuration step entity containing the properties to verify
-     * @return The verification results entity
+     * @param requestEntity The verify config request entity containing the properties to verify
+     * @return The verification request entity with the request ID
      */
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
@@ -797,47 +814,60 @@ public class ConnectorResource extends ApplicationResource {
     @Operation(
             summary = "Performs verification of a configuration step for a connector",
             responses = {
-                    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = ConfigurationStepVerificationResultsEntity.class))),
+                    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = VerifyConnectorConfigStepRequestEntity.class))),
                     @ApiResponse(responseCode = "400", description = "NiFi was unable to complete the request because it was invalid. The request should not be retried without modification."),
                     @ApiResponse(responseCode = "401", description = "Client could not be authenticated."),
                     @ApiResponse(responseCode = "403", description = "Client is not authorized to make this request."),
                     @ApiResponse(responseCode = "404", description = "The specified resource could not be found."),
                     @ApiResponse(responseCode = "409", description = "The request was valid but NiFi was not in the appropriate state to process it.")
             },
-            description = "Performs verification of the provided configuration for a specific configuration step of a connector. " +
-                    "This will return the verification results synchronously.",
+            description = "This will initiate the process of verifying a given Connector Configuration Step. This may be a long-running task. As a result, " +
+                    "this endpoint will immediately return a VerifyConnectorConfigStepRequestEntity, and the process of performing the verification will occur asynchronously in the background. " +
+                    "The client may then periodically poll the status of the request by issuing a GET request to " +
+                    "/connectors/{connectorId}/configuration-steps/{stepName}/verify-config/{requestId}. Once the request is completed, the client is expected to issue a DELETE request to " +
+                    "/connectors/{connectorId}/configuration-steps/{stepName}/verify-config/{requestId}.",
             security = {
                     @SecurityRequirement(name = "Write - /connectors/{uuid}")
             }
     )
-    public Response verifyConfigurationStep(
-            @Parameter(
-                    description = "The connector id.",
-                    required = true
-            )
+    public Response submitConfigurationStepVerificationRequest(
+            @Parameter(description = "The connector id.", required = true)
             @PathParam("id") final String id,
-            @Parameter(
-                    description = "The configuration step name.",
-                    required = true
-            )
+            @Parameter(description = "The configuration step name.", required = true)
             @PathParam("configurationStepName") final String configurationStepName,
-            @Parameter(
-                    description = "The configuration step entity with properties to verify.",
-                    required = true
-            ) final ConfigurationStepEntity requestEntity) {
+            @Parameter(description = "The verify config request entity containing the configuration step to verify.", required = true)
+            final VerifyConnectorConfigStepRequestEntity requestEntity) {
 
-        if (requestEntity == null || requestEntity.getConfigurationStep() == null) {
-            throw new IllegalArgumentException("Configuration step details must be specified.");
+        if (requestEntity == null) {
+            throw new IllegalArgumentException("Connector configuration step verification request must be specified.");
         }
 
-        final ConfigurationStepConfigurationDTO configurationStep = requestEntity.getConfigurationStep();
-        if (!configurationStepName.equals(configurationStep.getConfigurationStepName())) {
-            throw new IllegalArgumentException("The configuration step name in the request body does not match the configuration step name in the URL.");
+        final VerifyConnectorConfigStepRequestDTO requestDto = requestEntity.getRequest();
+        if (requestDto == null || requestDto.getConfigurationStep() == null) {
+            throw new IllegalArgumentException("Connector configuration step must be specified.");
+        }
+
+        if (requestDto.getConnectorId() == null) {
+            throw new IllegalArgumentException("Connector's identifier must be specified in the request.");
+        }
+
+        if (!requestDto.getConnectorId().equals(id)) {
+            throw new IllegalArgumentException("Connector's identifier in the request must match the identifier provided in the URL.");
+        }
+
+        if (requestDto.getConfigurationStepName() == null) {
+            throw new IllegalArgumentException("Configuration step name must be specified in the request.");
+        }
+
+        if (!requestDto.getConfigurationStepName().equals(configurationStepName)) {
+            throw new IllegalArgumentException("Configuration step name in the request must match the step name provided in the URL.");
         }
 
         if (isReplicateRequest()) {
             return replicate(HttpMethod.POST, requestEntity);
         }
+
+        final NiFiUser user = NiFiUserUtils.getNiFiUser();
 
         return withWriteLock(
                 serviceFacade,
@@ -849,22 +879,193 @@ public class ConnectorResource extends ApplicationResource {
                 () -> {
                     serviceFacade.verifyCanVerifyConnectorConfigurationStep(id, configurationStepName);
                 },
-                entity -> {
-                    final ConfigurationStepConfigurationDTO configStepConfig = entity.getConfigurationStep();
-                    
-                    // Extract properties from the configuration step
-                    final Map<String, String> properties = extractPropertiesFromConfigurationStep(configStepConfig);
-
-                    // Perform verification
-                    final List<ConfigVerificationResultDTO> results = serviceFacade.performConnectorConfigurationStepVerification(id, configurationStepName, properties);
-
-                    // Create and return the results entity
-                    final ConfigurationStepVerificationResultsEntity resultsEntity = new ConfigurationStepVerificationResultsEntity();
-                    resultsEntity.setResults(results);
-
-                    return generateOkResponse(resultsEntity).build();
-                }
+                entity -> performAsyncConfigStepVerification(entity, id, configurationStepName, user)
         );
+    }
+
+    /**
+     * Returns the verification request with the given ID for a connector configuration step.
+     *
+     * @param id The id of the connector
+     * @param configurationStepName The name of the configuration step
+     * @param requestId The id of the verification request
+     * @return The verification request entity
+     */
+    @GET
+    @Consumes(MediaType.WILDCARD)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Path("/{id}/configuration-steps/{configurationStepName}/verify-config/{requestId}")
+    @Operation(
+            summary = "Returns the Verification Request with the given ID",
+            responses = {
+                    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = VerifyConnectorConfigStepRequestEntity.class))),
+                    @ApiResponse(responseCode = "400", description = "NiFi was unable to complete the request because it was invalid. The request should not be retried without modification."),
+                    @ApiResponse(responseCode = "401", description = "Client could not be authenticated."),
+                    @ApiResponse(responseCode = "403", description = "Client is not authorized to make this request."),
+                    @ApiResponse(responseCode = "404", description = "The specified resource could not be found."),
+                    @ApiResponse(responseCode = "409", description = "The request was valid but NiFi was not in the appropriate state to process it.")
+            },
+            description = "Returns the Verification Request with the given ID. Once a Verification Request has been created, "
+                    + "that request can subsequently be retrieved via this endpoint, and the request that is fetched will contain the updated state, such as percent complete, the "
+                    + "current state of the request, and any failures.",
+            security = {
+                    @SecurityRequirement(name = "Only the user that submitted the request can get it")
+            }
+    )
+    public Response getConfigurationStepVerificationRequest(
+            @Parameter(description = "The connector id.", required = true)
+            @PathParam("id") final String id,
+            @Parameter(description = "The configuration step name.", required = true)
+            @PathParam("configurationStepName") final String configurationStepName,
+            @Parameter(description = "The ID of the Verification Request", required = true)
+            @PathParam("requestId") final String requestId) {
+
+        if (isReplicateRequest()) {
+            return replicate(HttpMethod.GET);
+        }
+
+        final NiFiUser user = NiFiUserUtils.getNiFiUser();
+
+        final AsynchronousWebRequest<VerifyConnectorConfigStepRequestEntity, List<ConfigVerificationResultDTO>> asyncRequest =
+                configVerificationRequestManager.getRequest(VERIFICATION_REQUEST_TYPE, requestId, user);
+        final VerifyConnectorConfigStepRequestEntity updateRequestEntity = createVerifyConnectorConfigStepRequestEntity(asyncRequest, id, configurationStepName, requestId);
+        return generateOkResponse(updateRequestEntity).build();
+    }
+
+    /**
+     * Deletes the verification request with the given ID for a connector configuration step.
+     *
+     * @param id The id of the connector
+     * @param configurationStepName The name of the configuration step
+     * @param requestId The id of the verification request
+     * @return The verification request entity
+     */
+    @DELETE
+    @Consumes(MediaType.WILDCARD)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Path("/{id}/configuration-steps/{configurationStepName}/verify-config/{requestId}")
+    @Operation(
+            summary = "Deletes the Verification Request with the given ID",
+            responses = {
+                    @ApiResponse(responseCode = "200", content = @Content(schema = @Schema(implementation = VerifyConnectorConfigStepRequestEntity.class))),
+                    @ApiResponse(responseCode = "400", description = "NiFi was unable to complete the request because it was invalid. The request should not be retried without modification."),
+                    @ApiResponse(responseCode = "401", description = "Client could not be authenticated."),
+                    @ApiResponse(responseCode = "403", description = "Client is not authorized to make this request."),
+                    @ApiResponse(responseCode = "404", description = "The specified resource could not be found."),
+                    @ApiResponse(responseCode = "409", description = "The request was valid but NiFi was not in the appropriate state to process it.")
+            },
+            description = "Deletes the Verification Request with the given ID. After a request is created, it is expected "
+                    + "that the client will properly clean up the request by DELETE'ing it, once the Verification process has completed. If the request is deleted before the request "
+                    + "completes, then the Verification request will finish the step that it is currently performing and then will cancel any subsequent steps.",
+            security = {
+                    @SecurityRequirement(name = "Only the user that submitted the request can remove it")
+            }
+    )
+    public Response deleteConfigurationStepVerificationRequest(
+            @Parameter(description = "The connector id.", required = true)
+            @PathParam("id") final String id,
+            @Parameter(description = "The configuration step name.", required = true)
+            @PathParam("configurationStepName") final String configurationStepName,
+            @Parameter(description = "The ID of the Verification Request", required = true)
+            @PathParam("requestId") final String requestId) {
+
+        if (isReplicateRequest()) {
+            return replicate(HttpMethod.DELETE);
+        }
+
+        final NiFiUser user = NiFiUserUtils.getNiFiUser();
+        final boolean twoPhaseRequest = isTwoPhaseRequest(httpServletRequest);
+        final boolean executionPhase = isExecutionPhase(httpServletRequest);
+
+        if (!twoPhaseRequest || executionPhase) {
+            final AsynchronousWebRequest<VerifyConnectorConfigStepRequestEntity, List<ConfigVerificationResultDTO>> asyncRequest =
+                    configVerificationRequestManager.removeRequest(VERIFICATION_REQUEST_TYPE, requestId, user);
+
+            if (!asyncRequest.isComplete()) {
+                asyncRequest.cancel();
+            }
+
+            final VerifyConnectorConfigStepRequestEntity updateRequestEntity = createVerifyConnectorConfigStepRequestEntity(asyncRequest, id, configurationStepName, requestId);
+            return generateOkResponse(updateRequestEntity).build();
+        }
+
+        if (isValidationPhase(httpServletRequest)) {
+            configVerificationRequestManager.getRequest(VERIFICATION_REQUEST_TYPE, requestId, user);
+            return generateContinueResponse().build();
+        } else if (isCancellationPhase(httpServletRequest)) {
+            return generateOkResponse().build();
+        } else {
+            throw new IllegalStateException("This request does not appear to be part of the two phase commit.");
+        }
+    }
+
+    private Response performAsyncConfigStepVerification(final VerifyConnectorConfigStepRequestEntity requestEntity, final String connectorId,
+                                                        final String configurationStepName, final NiFiUser user) {
+        final String requestId = generateUuid();
+        logger.debug("Generated Config Verification Request with ID {} for Connector {} Configuration Step {}", requestId, connectorId, configurationStepName);
+
+        final VerifyConnectorConfigStepRequestDTO requestDto = requestEntity.getRequest();
+        final List<UpdateStep> updateSteps = Collections.singletonList(new StandardUpdateStep("Verify Connector Configuration Step"));
+
+        final AsynchronousWebRequest<VerifyConnectorConfigStepRequestEntity, List<ConfigVerificationResultDTO>> request =
+                new StandardAsynchronousWebRequest<>(requestId, requestEntity, connectorId, user, updateSteps);
+
+        final Consumer<AsynchronousWebRequest<VerifyConnectorConfigStepRequestEntity, List<ConfigVerificationResultDTO>>> updateTask = asyncRequest -> {
+            try {
+                final Map<String, String> properties = extractPropertiesFromConfigurationStep(requestDto.getConfigurationStep());
+                final List<ConfigVerificationResultDTO> results = serviceFacade.performConnectorConfigurationStepVerification(connectorId, configurationStepName, properties);
+                asyncRequest.markStepComplete(results);
+            } catch (final Exception e) {
+                logger.error("Failed to verify Connector Configuration Step", e);
+                asyncRequest.fail("Failed to verify Connector Configuration Step due to " + e);
+            }
+        };
+
+        configVerificationRequestManager.submitRequest(VERIFICATION_REQUEST_TYPE, requestId, request, updateTask);
+
+        final VerifyConnectorConfigStepRequestEntity resultsEntity = createVerifyConnectorConfigStepRequestEntity(request, connectorId, configurationStepName, requestId);
+        return generateOkResponse(resultsEntity).build();
+    }
+
+    private VerifyConnectorConfigStepRequestEntity createVerifyConnectorConfigStepRequestEntity(
+            final AsynchronousWebRequest<VerifyConnectorConfigStepRequestEntity, List<ConfigVerificationResultDTO>> asyncRequest,
+            final String connectorId, final String configurationStepName, final String requestId) {
+
+        final VerifyConnectorConfigStepRequestDTO requestDto = asyncRequest.getRequest().getRequest();
+        final List<ConfigVerificationResultDTO> resultsList = asyncRequest.getResults();
+
+        final VerifyConnectorConfigStepRequestDTO dto = new VerifyConnectorConfigStepRequestDTO();
+        dto.setConnectorId(requestDto.getConnectorId());
+        dto.setConfigurationStepName(requestDto.getConfigurationStepName());
+        dto.setConfigurationStep(requestDto.getConfigurationStep());
+        dto.setResults(resultsList);
+
+        dto.setComplete(asyncRequest.isComplete());
+        dto.setFailureReason(asyncRequest.getFailureReason());
+        dto.setLastUpdated(asyncRequest.getLastUpdated());
+        dto.setPercentCompleted(asyncRequest.getPercentComplete());
+        dto.setRequestId(requestId);
+        dto.setState(asyncRequest.getState());
+        dto.setUri(generateResourceUri("connectors", connectorId, "configuration-steps", configurationStepName, "verify-config", requestId));
+
+        final VerifyConnectorConfigStepRequestEntity entity = new VerifyConnectorConfigStepRequestEntity();
+        entity.setRequest(dto);
+        return entity;
+    }
+
+    private Map<String, String> extractPropertiesFromConfigurationStep(final ConfigurationStepConfigurationDTO configurationStep) {
+        final Map<String, String> properties = new java.util.HashMap<>();
+        if (configurationStep.getPropertyGroupConfigurations() != null) {
+            for (final PropertyGroupConfigurationDTO groupConfig : configurationStep.getPropertyGroupConfigurations()) {
+                if (groupConfig.getPropertyValues() != null) {
+                    for (final Map.Entry<String, ConnectorValueReferenceDTO> entry : groupConfig.getPropertyValues().entrySet()) {
+                        final ConnectorValueReferenceDTO valueRef = entry.getValue();
+                        properties.put(entry.getKey(), valueRef != null ? valueRef.getValue() : null);
+                    }
+                }
+            }
+        }
+        return properties;
     }
 
     /**
@@ -924,24 +1125,6 @@ public class ConnectorResource extends ApplicationResource {
 
         // generate the response
         return noCache(Response.ok(entity)).build();
-    }
-
-    /**
-     * Extracts properties from the configuration step into a flat map.
-     */
-    private Map<String, String> extractPropertiesFromConfigurationStep(final ConfigurationStepConfigurationDTO configurationStep) {
-        final Map<String, String> properties = new HashMap<>();
-        if (configurationStep.getPropertyGroupConfigurations() != null) {
-            for (final PropertyGroupConfigurationDTO groupConfig : configurationStep.getPropertyGroupConfigurations()) {
-                if (groupConfig.getPropertyValues() != null) {
-                    for (final Map.Entry<String, ConnectorValueReferenceDTO> entry : groupConfig.getPropertyValues().entrySet()) {
-                        final ConnectorValueReferenceDTO valueRef = entry.getValue();
-                        properties.put(entry.getKey(), valueRef != null ? valueRef.getValue() : null);
-                    }
-                }
-            }
-        }
-        return properties;
     }
 
     private ConnectorDTO createDTOWithDesiredRunStatus(final String id, final String runStatus) {

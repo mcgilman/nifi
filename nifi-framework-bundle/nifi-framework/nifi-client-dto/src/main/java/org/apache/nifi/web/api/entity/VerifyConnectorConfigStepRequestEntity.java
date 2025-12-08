@@ -18,29 +18,20 @@ package org.apache.nifi.web.api.entity;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.xml.bind.annotation.XmlRootElement;
-import org.apache.nifi.web.api.dto.ConfigVerificationResultDTO;
+import org.apache.nifi.web.api.dto.VerifyConnectorConfigStepRequestDTO;
 
-import java.util.List;
+@XmlRootElement(name = "verifyConnectorConfigStepRequestEntity")
+public class VerifyConnectorConfigStepRequestEntity extends Entity {
 
-/**
- * A serialized representation of this class can be placed in the entity body of a response to or from the API.
- * This particular entity holds a list of verification results for a configuration step.
- */
-@XmlRootElement(name = "configurationStepVerificationResultsEntity")
-public class ConfigurationStepVerificationResultsEntity extends Entity {
+    private VerifyConnectorConfigStepRequestDTO request;
 
-    private List<ConfigVerificationResultDTO> results;
-
-    /**
-     * @return the verification results
-     */
-    @Schema(description = "The list of verification results.")
-    public List<ConfigVerificationResultDTO> getResults() {
-        return results;
+    @Schema(description = "The verification request")
+    public VerifyConnectorConfigStepRequestDTO getRequest() {
+        return request;
     }
 
-    public void setResults(final List<ConfigVerificationResultDTO> results) {
-        this.results = results;
+    public void setRequest(final VerifyConnectorConfigStepRequestDTO request) {
+        this.request = request;
     }
 }
 

@@ -6714,6 +6714,7 @@ public class StandardNiFiServiceFacade implements NiFiServiceFacade {
                 case AccessPolicy -> authorizableLookup.getAccessPolicyById(sourceId);
                 case User, UserGroup -> authorizableLookup.getTenant();
                 case Label -> authorizableLookup.getLabel(sourceId);
+                case Connector -> authorizableLookup.getConnector(sourceId);
             };
         } catch (final ResourceNotFoundException e) {
             // if the underlying component is gone, use the controller to see if permissions should be allowed

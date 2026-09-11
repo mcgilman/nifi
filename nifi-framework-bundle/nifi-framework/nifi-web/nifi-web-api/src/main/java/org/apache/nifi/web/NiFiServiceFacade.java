@@ -388,6 +388,25 @@ public interface NiFiServiceFacade {
     Set<Revision> getRevisionsFromGroup(String groupId, Function<ProcessGroup, Set<String>> getComponents);
 
     /**
+     * Identifies source component identifiers in the given Process Group and its Standard-engine descendants.
+     * Sources are processors with no non-loop incoming connection, Remote Process Group output ports,
+     * and public input ports with no non-loop incoming connection. Components owned by Process Groups
+     * that resolve to the Stateless Execution Engine are excluded.
+     *
+     * @param group the process group to search
+     * @return identifiers of source components
+     */
+    Set<String> findSourceComponentIds(ProcessGroup group);
+
+    /**
+     * Verifies that source components can be stopped in the specified Process Group.
+     *
+     * @param groupId process group identifier
+     * @throws IllegalStateException when the Process Group resolves to the Stateless Execution Engine
+     */
+    void verifyStopSources(String groupId);
+
+    /**
      * Gets the revisions from the specified snippet.
      *
      * @param snippetId snippet

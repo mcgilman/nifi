@@ -26,6 +26,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.prometheus.client.Collector.MetricFamilySamples.Sample;
 import io.prometheus.client.CollectorRegistry;
 import io.prometheus.client.exporter.common.TextFormat;
+import jakarta.ws.rs.HttpMethod;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.StreamingOutput;
@@ -35,6 +36,7 @@ import org.apache.nifi.components.ValidationResult;
 import org.apache.nifi.components.validation.DisabledServiceValidationResult;
 import org.apache.nifi.connectable.Port;
 import org.apache.nifi.controller.ProcessorNode;
+import org.apache.nifi.controller.ScheduledState;
 import org.apache.nifi.controller.service.ControllerServiceNode;
 import org.apache.nifi.controller.status.ProcessGroupStatus;
 import org.apache.nifi.controller.status.ProcessingPerformanceStatus;
@@ -52,12 +54,15 @@ import org.apache.nifi.registry.flow.FlowVersionLocation;
 import org.apache.nifi.util.NiFiProperties;
 import org.apache.nifi.web.NiFiServiceFacade;
 import org.apache.nifi.web.ResourceNotFoundException;
+import org.apache.nifi.web.Revision;
 import org.apache.nifi.web.api.dto.ComponentDifferenceDTO;
 import org.apache.nifi.web.api.dto.DifferenceDTO;
+import org.apache.nifi.web.api.dto.RevisionDTO;
 import org.apache.nifi.web.api.entity.ActivateControllerServicesEntity;
 import org.apache.nifi.web.api.entity.ClearBulletinsForGroupRequestEntity;
 import org.apache.nifi.web.api.entity.ConnectorEntity;
 import org.apache.nifi.web.api.entity.FlowComparisonEntity;
+import org.apache.nifi.web.api.entity.ScheduleComponentsEntity;
 import org.apache.nifi.web.api.request.FlowMetricsProducer;
 import org.apache.nifi.web.api.request.FlowMetricsReportingStrategy;
 import org.jetbrains.annotations.NotNull;
@@ -102,6 +107,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -614,6 +620,160 @@ public class TestFlowResource {
         assertTrue(componentIds.contains("controller-service-1"), "Authorized controller service should be included");
         assertFalse(componentIds.contains("controller-service-2"), "Unauthorized controller service should be excluded");
         assertEquals(5, componentIds.size(), "Should have exactly 5 authorized components");
+    }
+
+    @Test
+    public void testStopSourcesUsesFacadeToIdentifySources() {
+        final ScheduleComponentsEntity entity = new ScheduleComponentsEntity();
+        entity.setId(PROCESS_GROUP_ID);
+        entity.setState(ScheduledState.STOPPED.name());
+
+        when(properties.isNode()).thenReturn(false);
+        resource.httpServletRequest = new MockHttpServletRequest();
+
+        final ProcessGroup processGroup = mock(ProcessGroup.class);
+        final Set<String> identifiedSources = Set.of("source-processor", "remote-output", "public-input");
+        when(serviceFacade.findSourceComponentIds(processGroup)).thenReturn(identifiedSources);
+
+        final ArgumentCaptor<Function<ProcessGroup, Set<String>>> revisionsCaptor = ArgumentCaptor.captor();
+        when(serviceFacade.getRevisionsFromGroup(eq(PROCESS_GROUP_ID), revisionsCaptor.capture())).thenReturn(Set.of());
+        when(serviceFacade.scheduleComponents(eq(PROCESS_GROUP_ID), eq(ScheduledState.STOPPED), any())).thenReturn(entity);
+
+        final Response response = resource.stopSources(PROCESS_GROUP_ID, entity);
+
+        assertNotNull(response);
+        assertEquals(HttpURLConnection.HTTP_OK, response.getStatus());
+        assertTrue(entity.getComponents().isEmpty());
+        assertEquals(identifiedSources, revisionsCaptor.getValue().apply(processGroup));
+    }
+
+    @Test
+    public void testStopSourcesUnauthorizedSourceDoesNotSchedule() {
+        final ScheduleComponentsEntity entity = new ScheduleComponentsEntity();
+        entity.setId(PROCESS_GROUP_ID);
+        entity.setState(ScheduledState.STOPPED.name());
+
+        when(properties.isNode()).thenReturn(false);
+        resource.httpServletRequest = new MockHttpServletRequest();
+
+        when(serviceFacade.getRevisionsFromGroup(eq(PROCESS_GROUP_ID), any())).thenReturn(Set.of(new Revision(1L, "client", "source-processor")));
+        doThrow(new AccessDeniedException("denied")).when(serviceFacade).authorizeAccess(any());
+
+        assertThrows(AccessDeniedException.class, () -> resource.stopSources(PROCESS_GROUP_ID, entity));
+
+        verify(serviceFacade, never()).scheduleComponents(anyString(), any(), any());
+        verify(serviceFacade, never()).verifyScheduleComponents(anyString(), any(), any());
+    }
+
+    @Test
+    public void testStopSourcesWithNoSourcesReturnsEmptyComponents() {
+        final ScheduleComponentsEntity entity = new ScheduleComponentsEntity();
+        entity.setId(PROCESS_GROUP_ID);
+        entity.setState(ScheduledState.STOPPED.name());
+
+        when(properties.isNode()).thenReturn(false);
+        resource.httpServletRequest = new MockHttpServletRequest();
+
+        when(serviceFacade.getRevisionsFromGroup(eq(PROCESS_GROUP_ID), any())).thenReturn(Set.of());
+        when(serviceFacade.scheduleComponents(eq(PROCESS_GROUP_ID), eq(ScheduledState.STOPPED), any())).thenReturn(entity);
+
+        final Response response = resource.stopSources(PROCESS_GROUP_ID, entity);
+
+        assertEquals(HttpURLConnection.HTTP_OK, response.getStatus());
+        assertTrue(entity.getComponents().isEmpty());
+        verify(serviceFacade).scheduleComponents(eq(PROCESS_GROUP_ID), eq(ScheduledState.STOPPED), eq(Map.of()));
+    }
+
+    @Test
+    public void testStopSourcesStatelessProcessGroupDoesNotDiscoverOrSchedule() {
+        final RevisionDTO revision = new RevisionDTO();
+        revision.setVersion(1L);
+        final ScheduleComponentsEntity entity = new ScheduleComponentsEntity();
+        entity.setId(PROCESS_GROUP_ID);
+        entity.setState(ScheduledState.STOPPED.name());
+        entity.setComponents(Map.of("source-processor", revision));
+
+        doThrow(new IllegalStateException("Stateless Process Group")).when(serviceFacade).verifyStopSources(PROCESS_GROUP_ID);
+
+        assertThrows(IllegalStateException.class, () -> resource.stopSources(PROCESS_GROUP_ID, entity));
+
+        verify(serviceFacade, never()).getRevisionsFromGroup(anyString(), any());
+        verify(serviceFacade, never()).authorizeAccess(any());
+        verify(serviceFacade, never()).verifyScheduleComponents(anyString(), any(), any());
+        verify(serviceFacade, never()).scheduleComponents(anyString(), any(), any());
+    }
+
+    @Test
+    public void testStopSourcesResponseIncludesStoppedComponentIds() {
+        final ScheduleComponentsEntity request = new ScheduleComponentsEntity();
+        request.setId(PROCESS_GROUP_ID);
+        request.setState(ScheduledState.STOPPED.name());
+
+        when(properties.isNode()).thenReturn(false);
+        resource.httpServletRequest = new MockHttpServletRequest();
+
+        when(serviceFacade.getRevisionsFromGroup(eq(PROCESS_GROUP_ID), any()))
+                .thenReturn(Set.of(new Revision(1L, "client", "source-processor")));
+
+        final ScheduleComponentsEntity facadeResponse = new ScheduleComponentsEntity();
+        facadeResponse.setId(PROCESS_GROUP_ID);
+        facadeResponse.setState(ScheduledState.STOPPED.name());
+        when(serviceFacade.scheduleComponents(eq(PROCESS_GROUP_ID), eq(ScheduledState.STOPPED), any())).thenReturn(facadeResponse);
+
+        final Response response = resource.stopSources(PROCESS_GROUP_ID, request);
+
+        assertEquals(HttpURLConnection.HTTP_OK, response.getStatus());
+        final ScheduleComponentsEntity responseEntity = (ScheduleComponentsEntity) response.getEntity();
+        assertNotNull(responseEntity.getComponents());
+        assertEquals(Set.of("source-processor"), responseEntity.getComponents().keySet());
+    }
+
+    @Test
+    public void testStopSourcesAuthorizesSuppliedComponentsBeforeReplicate() {
+        final FlowResource spyResource = spy(resource);
+        doReturn(true).when(spyResource).isReplicateRequest();
+        doReturn(Response.ok().build()).when(spyResource).replicate(anyString(), any());
+
+        final RevisionDTO revisionDto = new RevisionDTO();
+        revisionDto.setClientId("client");
+        revisionDto.setVersion(1L);
+
+        final ScheduleComponentsEntity request = new ScheduleComponentsEntity();
+        request.setId(PROCESS_GROUP_ID);
+        request.setState(ScheduledState.STOPPED.name());
+        request.setComponents(Map.of("source-processor", revisionDto));
+
+        final Response response = spyResource.stopSources(PROCESS_GROUP_ID, request);
+
+        assertEquals(HttpURLConnection.HTTP_OK, response.getStatus());
+        verify(serviceFacade).authorizeAccess(any());
+        verify(serviceFacade, never()).getRevisionsFromGroup(anyString(), any());
+        verify(spyResource).replicate(eq(HttpMethod.PUT), eq(request));
+        verify(serviceFacade, never()).scheduleComponents(anyString(), any(), any());
+        assertEquals(Set.of("source-processor"), request.getComponents().keySet());
+    }
+
+    @Test
+    public void testStopSourcesUnauthorizedSuppliedComponentsDoesNotReplicate() {
+        final FlowResource spyResource = spy(resource);
+
+        final RevisionDTO revisionDto = new RevisionDTO();
+        revisionDto.setClientId("client");
+        revisionDto.setVersion(1L);
+
+        final ScheduleComponentsEntity request = new ScheduleComponentsEntity();
+        request.setId(PROCESS_GROUP_ID);
+        request.setState(ScheduledState.STOPPED.name());
+        request.setComponents(Map.of("source-processor", revisionDto));
+
+        doThrow(new AccessDeniedException("denied")).when(serviceFacade).authorizeAccess(any());
+
+        assertThrows(AccessDeniedException.class, () -> spyResource.stopSources(PROCESS_GROUP_ID, request));
+
+        verify(serviceFacade).authorizeAccess(any());
+        verify(spyResource, never()).replicate(anyString(), any());
+        verify(serviceFacade, never()).scheduleComponents(anyString(), any(), any());
+        verify(serviceFacade, never()).getRevisionsFromGroup(anyString(), any());
     }
 
     @Test

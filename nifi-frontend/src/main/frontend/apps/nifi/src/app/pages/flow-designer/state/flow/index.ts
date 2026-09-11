@@ -470,6 +470,8 @@ export interface Flow {
     funnels: ComponentEntity[];
 }
 
+export type ResolvedExecutionEngine = 'STANDARD' | 'STATELESS';
+
 export interface ProcessGroupFlow {
     id: string;
     uri: string;
@@ -478,6 +480,7 @@ export interface ProcessGroupFlow {
     parameterContext: ParameterContextReferenceEntity | null;
     flow: Flow;
     lastRefreshed: string;
+    resolvedExecutionEngine: ResolvedExecutionEngine;
 }
 
 export interface ProcessGroupFlowEntity {
@@ -646,6 +649,10 @@ export interface StopProcessGroupRequest {
     id: string;
     type: ComponentType;
     errorStrategy: 'snackbar' | 'banner';
+}
+
+export interface StopSourcesRequest {
+    id: string;
 }
 
 export interface StopComponentResponse {

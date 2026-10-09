@@ -17,59 +17,58 @@
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { CreatePort } from './create-port.component';
-import { CreateComponentRequest } from '../../../../../state/flow';
-import { ComponentType } from '@nifi/shared';
+import { CreateRemoteProcessGroup } from './create-remote-process-group.component';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { ComponentType } from '@nifi/shared';
 import { provideMockStore } from '@ngrx/store/testing';
-import { initialState } from '../../../../../state/flow/flow.reducer';
+import { initialState as initialErrorState } from '../../../../state/error/error.reducer';
+import { errorFeatureKey } from '../../../../state/error';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { initialState as initialErrorState } from '../../../../../../../state/error/error.reducer';
-import { errorFeatureKey } from '../../../../../../../state/error';
-import { initialState as initialCurrentUserState } from '../../../../../../../state/current-user/current-user.reducer';
-import { currentUserFeatureKey } from '../../../../../../../state/current-user';
-import { canvasFeatureKey } from '../../../../../state';
-import { flowFeatureKey } from '../../../../../state/flow';
+import { CreateComponentRequest } from '../../../../state/flow-shared';
 
-describe('CreatePort', () => {
-    let component: CreatePort;
-    let fixture: ComponentFixture<CreatePort>;
+describe('CreateRemoteProcessGroup', () => {
+    let component: CreateRemoteProcessGroup;
+    let fixture: ComponentFixture<CreateRemoteProcessGroup>;
 
     const data: CreateComponentRequest = {
         revision: {
-            clientId: 'c7c9ebd1-4c87-4fa9-a760-956acbbaec4d',
+            clientId: 'a6482293-7fe8-43b4-8ab4-ee95b3b27721',
             version: 0
         },
-        type: ComponentType.InputPort,
+        type: ComponentType.RemoteProcessGroup,
         position: {
-            x: 1240,
-            y: -560
+            x: -4,
+            y: -698.5
         }
     };
 
     beforeEach(() => {
         TestBed.configureTestingModule({
-            imports: [CreatePort, NoopAnimationsModule],
+            imports: [CreateRemoteProcessGroup, NoopAnimationsModule],
             providers: [
                 { provide: MAT_DIALOG_DATA, useValue: data },
                 provideMockStore({
                     initialState: {
-                        [errorFeatureKey]: initialErrorState,
-                        [currentUserFeatureKey]: initialCurrentUserState,
-                        [canvasFeatureKey]: {
-                            [flowFeatureKey]: initialState
-                        }
+                        [errorFeatureKey]: initialErrorState
                     }
                 }),
                 { provide: MatDialogRef, useValue: null }
             ]
         });
-        fixture = TestBed.createComponent(CreatePort);
+        fixture = TestBed.createComponent(CreateRemoteProcessGroup);
         component = fixture.componentInstance;
         fixture.detectChanges();
     });
 
     it('should create', () => {
         expect(component).toBeTruthy();
+    });
+
+    it('emits the remote process group request', () => {
+        const emitted: unknown[] = [];
+        component.createRemoteProcessGroup.subscribe((request) => emitted.push(request));
+        component.createRemoteProcessGroupForm.get('urls')?.setValue('http://localhost:8443/nifi');
+        component.submitCreateRemoteProcessGroup();
+        expect(emitted).toHaveLength(1);
     });
 });

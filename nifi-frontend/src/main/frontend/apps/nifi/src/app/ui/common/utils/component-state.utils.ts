@@ -80,6 +80,26 @@ export function getComponentTypeForDestination(connectableType: string): Compone
 }
 
 /**
+ * Returns the NiFi connectable type string for a given ComponentType source.
+ */
+export function getConnectableTypeForSource(type: ComponentType): string {
+    switch (type) {
+        case ComponentType.Processor:
+            return 'PROCESSOR';
+        case ComponentType.RemoteProcessGroup:
+            return 'REMOTE_OUTPUT_PORT';
+        case ComponentType.ProcessGroup:
+            return 'OUTPUT_PORT';
+        case ComponentType.InputPort:
+            return 'INPUT_PORT';
+        case ComponentType.Funnel:
+            return 'FUNNEL';
+        default:
+            return '';
+    }
+}
+
+/**
  * Returns the NiFi connectable type string for a given ComponentType destination.
  */
 export function getConnectableTypeForDestination(type: ComponentType): string {

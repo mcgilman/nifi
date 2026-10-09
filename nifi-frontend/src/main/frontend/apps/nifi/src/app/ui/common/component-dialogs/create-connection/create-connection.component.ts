@@ -15,16 +15,19 @@
  * limitations under the License.
  */
 
-import { Component, Input, inject } from '@angular/core';
+import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
-import { CreateConnectionDialogRequest, SelectedComponent } from '../../../../../state/flow';
+import {
+    CreateConnection as CreateConnectionPayload,
+    CreateConnectionDialogRequest,
+    SelectedComponent
+} from '../../../../state/flow-shared';
 import {
     BreadcrumbEntity,
+    DocumentedType,
     loadBalanceCompressionStrategies,
     loadBalanceStrategies
-} from '../../../../../../../state/shared';
-import { Store } from '@ngrx/store';
-import { selectBreadcrumbs, selectSaving } from '../../../../../state/flow/flow.selectors';
+} from '../../../../state/shared';
 import { AsyncPipe } from '@angular/common';
 import { FormBuilder, FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -34,26 +37,23 @@ import { MatOptionModule } from '@angular/material/core';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTabsModule } from '@angular/material/tabs';
 import { ComponentType, NifiSpinnerDirective, TextTip, NifiTooltipDirective, CloseOnEscapeDialog } from '@nifi/shared';
-import { NiFiState } from '../../../../../../../state';
-import { selectPrioritizerTypes } from '../../../../../../../state/extension-types/extension-types.selectors';
-import { Prioritizers } from '../../../../../../../ui/common/component-dialogs/edit-connection/prioritizers/prioritizers.component';
-import { SourceProcessor } from '../../../../../../../ui/common/component-dialogs/edit-connection/source/source-processor/source-processor.component';
-import { DestinationFunnel } from '../../../../../../../ui/common/component-dialogs/edit-connection/destination/destination-funnel/destination-funnel.component';
-import { createConnection } from '../../../../../state/flow/flow.actions';
-import { Client } from '../../../../../../../service/client.service';
-import { SourceFunnel } from '../../../../../../../ui/common/component-dialogs/edit-connection/source/source-funnel/source-funnel.component';
-import { DestinationProcessor } from '../../../../../../../ui/common/component-dialogs/edit-connection/destination/destination-processor/destination-processor.component';
-import { DestinationOutputPort } from '../../../../../../../ui/common/component-dialogs/edit-connection/destination/destination-output-port/destination-output-port.component';
-import { SourceInputPort } from '../../../../../../../ui/common/component-dialogs/edit-connection/source/source-input-port/source-input-port.component';
-import { Observable, tap } from 'rxjs';
-import { SourceProcessGroup } from '../../../../../../../ui/common/component-dialogs/edit-connection/source/source-process-group/source-process-group.component';
-import { DestinationProcessGroup } from '../../../../../../../ui/common/component-dialogs/edit-connection/destination/destination-process-group/destination-process-group.component';
-import { SourceRemoteProcessGroup } from '../../../../../../../ui/common/component-dialogs/edit-connection/source/source-remote-process-group/source-remote-process-group.component';
-import { DestinationRemoteProcessGroup } from '../../../../../../../ui/common/component-dialogs/edit-connection/destination/destination-remote-process-group/destination-remote-process-group.component';
-import { ClusterConnectionService } from '../../../../../../../service/cluster-connection.service';
-import { CanvasUtils } from '../../../../../service/canvas-utils.service';
-import { ErrorContextKey } from '../../../../../../../state/error';
-import { ContextErrorBanner } from '../../../../../../../ui/common/context-error-banner/context-error-banner.component';
+import { Prioritizers } from '../edit-connection/prioritizers/prioritizers.component';
+import { SourceProcessor } from '../edit-connection/source/source-processor/source-processor.component';
+import { DestinationFunnel } from '../edit-connection/destination/destination-funnel/destination-funnel.component';
+import { Client } from '../../../../service/client.service';
+import { SourceFunnel } from '../edit-connection/source/source-funnel/source-funnel.component';
+import { DestinationProcessor } from '../edit-connection/destination/destination-processor/destination-processor.component';
+import { DestinationOutputPort } from '../edit-connection/destination/destination-output-port/destination-output-port.component';
+import { SourceInputPort } from '../edit-connection/source/source-input-port/source-input-port.component';
+import { Observable, of, tap } from 'rxjs';
+import { SourceProcessGroup } from '../edit-connection/source/source-process-group/source-process-group.component';
+import { DestinationProcessGroup } from '../edit-connection/destination/destination-process-group/destination-process-group.component';
+import { SourceRemoteProcessGroup } from '../edit-connection/source/source-remote-process-group/source-remote-process-group.component';
+import { DestinationRemoteProcessGroup } from '../edit-connection/destination/destination-remote-process-group/destination-remote-process-group.component';
+import { ClusterConnectionService } from '../../../../service/cluster-connection.service';
+import { ErrorContextKey } from '../../../../state/error';
+import { ContextErrorBanner } from '../../context-error-banner/context-error-banner.component';
+import { getConnectableTypeForDestination, getConnectableTypeForSource } from '../../utils/component-state.utils';
 
 @Component({
     selector: 'create-connection',
@@ -89,10 +89,13 @@ import { ContextErrorBanner } from '../../../../../../../ui/common/context-error
 export class CreateConnection extends CloseOnEscapeDialog {
     private dialogRequest = inject<CreateConnectionDialogRequest>(MAT_DIALOG_DATA);
     private formBuilder = inject(FormBuilder);
-    private store = inject<Store<NiFiState>>(Store);
-    private canvasUtils = inject(CanvasUtils);
     private clusterConnectionService = inject(ClusterConnectionService);
     private client = inject(Client);
+
+    @Input() saving$: Observable<boolean> = of(false);
+    @Input() availablePrioritizers$: Observable<DocumentedType[]> = of([]);
+    @Input() breadcrumbs$: Observable<BreadcrumbEntity | null> = of(null);
+    @Output() createConnection = new EventEmitter<CreateConnectionPayload>();
 
     @Input() set getChildOutputPorts(getChildOutputPorts: (groupId: string) => Observable<any>) {
         if (this.source.componentType == ComponentType.ProcessGroup) {
@@ -122,10 +125,6 @@ export class CreateConnection extends CloseOnEscapeDialog {
     protected readonly loadBalanceCompressionStrategies = loadBalanceCompressionStrategies;
     protected readonly ComponentType = ComponentType;
     protected readonly TextTip = TextTip;
-
-    saving$ = this.store.select(selectSaving);
-    availablePrioritizers$ = this.store.select(selectPrioritizerTypes);
-    breadcrumbs$ = this.store.select(selectBreadcrumbs);
 
     createConnectionForm: FormGroup;
     source: SelectedComponent;
@@ -223,7 +222,7 @@ export class CreateConnection extends CloseOnEscapeDialog {
         }
     }
 
-    createConnection(currentProcessGroupId: string): void {
+    submitCreateConnection(currentProcessGroupId: string): void {
         const payload: any = {
             revision: {
                 version: 0,
@@ -252,13 +251,13 @@ export class CreateConnection extends CloseOnEscapeDialog {
             payload.component.source = {
                 groupId: this.source.id,
                 id: this.createConnectionForm.get('source')?.value,
-                type: this.canvasUtils.getConnectableTypeForSource(this.source.componentType)
+                type: getConnectableTypeForSource(this.source.componentType)
             };
         } else {
             payload.component.source = {
                 groupId: currentProcessGroupId,
                 id: this.source.entity.id,
-                type: this.canvasUtils.getConnectableTypeForSource(this.source.componentType)
+                type: getConnectableTypeForSource(this.source.componentType)
             };
         }
 
@@ -269,13 +268,13 @@ export class CreateConnection extends CloseOnEscapeDialog {
             payload.component.destination = {
                 groupId: this.destination.id,
                 id: this.createConnectionForm.get('destination')?.value,
-                type: this.canvasUtils.getConnectableTypeForDestination(this.destination.componentType)
+                type: getConnectableTypeForDestination(this.destination.componentType)
             };
         } else {
             payload.component.destination = {
                 groupId: currentProcessGroupId,
                 id: this.destination.id,
-                type: this.canvasUtils.getConnectableTypeForDestination(this.destination.componentType)
+                type: getConnectableTypeForDestination(this.destination.componentType)
             };
         }
 
@@ -296,13 +295,9 @@ export class CreateConnection extends CloseOnEscapeDialog {
             payload.component.bends = this.dialogRequest.request.bends;
         }
 
-        this.store.dispatch(
-            createConnection({
-                request: {
-                    payload
-                }
-            })
-        );
+        this.createConnection.emit({
+            payload
+        });
     }
 
     override isDirty(): boolean {

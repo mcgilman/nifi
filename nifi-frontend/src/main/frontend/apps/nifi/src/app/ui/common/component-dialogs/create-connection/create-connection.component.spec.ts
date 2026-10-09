@@ -19,32 +19,16 @@ import { TestBed } from '@angular/core/testing';
 
 import { CreateConnection } from './create-connection.component';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
-import { MockStore, provideMockStore } from '@ngrx/store/testing';
-import { initialState as flowInitialState } from '../../../../../state/flow/flow.reducer';
-import { transformFeatureKey } from '../../../../../state/transform';
-import { initialState as initialTransformState } from '../../../../../state/transform/transform.reducer';
-import { controllerServicesFeatureKey } from '../../../../../state/controller-services';
-import { initialState as initialControllerServicesState } from '../../../../../state/controller-services/controller-services.reducer';
-import { parameterFeatureKey } from '../../../../../state/parameter';
-import { initialState as initialParameterState } from '../../../../../state/parameter/parameter.reducer';
-import { flowAnalysisFeatureKey } from '../../../../../state/flow-analysis';
-import { initialState as initialFlowAnalysisState } from '../../../../../state/flow-analysis/flow-analysis.reducer';
-import { flowConfigurationFeatureKey } from '../../../../../../../state/flow-configuration';
-import { initialState as initialFlowConfigurationState } from '../../../../../../../state/flow-configuration/flow-configuration.reducer';
-import { CreateConnectionDialogRequest } from '../../../../../state/flow';
+import { provideMockStore } from '@ngrx/store/testing';
+import { of } from 'rxjs';
+import { CreateConnectionDialogRequest } from '../../../../state/flow-shared';
 import { ComponentType } from '@nifi/shared';
-import { DocumentedType } from '../../../../../../../state/shared';
+import { DocumentedType } from '../../../../state/shared';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { ClusterConnectionService } from '../../../../../../../service/cluster-connection.service';
-import { initialState as initialErrorState } from '../../../../../../../state/error/error.reducer';
-import { errorFeatureKey } from '../../../../../../../state/error';
-import { initialState as initialCurrentUserState } from '../../../../../../../state/current-user/current-user.reducer';
-import { currentUserFeatureKey } from '../../../../../../../state/current-user';
-import { canvasFeatureKey } from '../../../../../state';
-import { flowFeatureKey } from '../../../../../state/flow';
-import { selectBreadcrumbs, selectSaving } from '../../../../../state/flow/flow.selectors';
-import { selectPrioritizerTypes } from '../../../../../../../state/extension-types/extension-types.selectors';
-import { createConnection } from '../../../../../state/flow/flow.actions';
+import { ClusterConnectionService } from '../../../../service/cluster-connection.service';
+import { initialState as initialErrorState } from '../../../../state/error/error.reducer';
+import { errorFeatureKey } from '../../../../state/error';
+import { Client } from '../../../../service/client.service';
 
 describe('CreateConnection', () => {
     // Mock data factories
@@ -151,6 +135,7 @@ describe('CreateConnection', () => {
         options: {
             source?: any;
             destination?: any;
+            bends?: Array<{ x: number; y: number }>;
         } = {}
     ) {
         const testSource = options.source || createMockInputPort();
@@ -159,7 +144,8 @@ describe('CreateConnection', () => {
         const testDialogData: CreateConnectionDialogRequest = {
             request: {
                 source: testSource,
-                destination: testDestination
+                destination: testDestination,
+                bends: options.bends
             },
             defaults: {
                 flowfileExpiration: '0 sec',
@@ -174,16 +160,7 @@ describe('CreateConnection', () => {
                 { provide: MAT_DIALOG_DATA, useValue: testDialogData },
                 provideMockStore({
                     initialState: {
-                        [errorFeatureKey]: initialErrorState,
-                        [currentUserFeatureKey]: initialCurrentUserState,
-                        [flowConfigurationFeatureKey]: initialFlowConfigurationState,
-                        [canvasFeatureKey]: {
-                            [flowFeatureKey]: flowInitialState,
-                            [transformFeatureKey]: initialTransformState,
-                            [controllerServicesFeatureKey]: initialControllerServicesState,
-                            [parameterFeatureKey]: initialParameterState,
-                            [flowAnalysisFeatureKey]: initialFlowAnalysisState
-                        }
+                        [errorFeatureKey]: initialErrorState
                     }
                 }),
                 {
@@ -196,19 +173,15 @@ describe('CreateConnection', () => {
             ]
         }).compileComponents();
 
-        const store = TestBed.inject(MockStore);
-
-        // Setup required selectors
-        store.overrideSelector(selectBreadcrumbs, createMockBreadcrumb());
-        store.overrideSelector(selectSaving, false);
-        store.overrideSelector(selectPrioritizerTypes, createMockPrioritizers());
-
         const fixture = TestBed.createComponent(CreateConnection);
         const component = fixture.componentInstance;
+        component.breadcrumbs$ = of(createMockBreadcrumb());
+        component.saving$ = of(false);
+        component.availablePrioritizers$ = of(createMockPrioritizers());
 
         fixture.detectChanges();
 
-        return { component, fixture, store };
+        return { component, fixture };
     }
 
     beforeEach(() => {
@@ -316,38 +289,83 @@ describe('CreateConnection', () => {
     });
 
     describe('Create connection method', () => {
-        it('should dispatch createConnection action when createConnection is called', async () => {
-            const { component, store } = await setup();
+        it('emits a create connection payload whose revision uses the local client id', async () => {
+            const { component } = await setup();
+            const client = TestBed.inject(Client);
+            const emitted: Array<{ payload: { revision: { version: number; clientId: string } } }> = [];
+            component.createConnection.subscribe((request) => emitted.push(request));
 
-            const dispatchSpy = vi.spyOn(store, 'dispatch');
+            component.submitCreateConnection('root');
 
-            component.createConnection('root');
-
-            expect(dispatchSpy).toHaveBeenCalledWith(
-                createConnection({
-                    request: expect.objectContaining({
-                        payload: expect.any(Object)
-                    })
-                })
-            );
+            expect(emitted).toHaveLength(1);
+            expect(emitted[0].payload.revision).toEqual({
+                version: 0,
+                clientId: client.getClientId()
+            });
         });
 
         it('should include relationships for Processor source type', async () => {
             const source = createMockProcessor('source-processor');
-            const { component, store, fixture } = await setup({ source });
+            const { component, fixture } = await setup({ source });
 
-            // Set relationships
             component.createConnectionForm.patchValue({ relationships: ['success'] });
             fixture.detectChanges();
 
-            const dispatchSpy = vi.spyOn(store, 'dispatch');
+            const emitted: Array<{ payload: { component: { selectedRelationships: string[] } } }> = [];
+            component.createConnection.subscribe((request) => emitted.push(request));
 
-            component.createConnection('root');
+            component.submitCreateConnection('root');
 
-            expect(dispatchSpy).toHaveBeenCalled();
-            const dispatchCall = dispatchSpy.mock.calls[0][0] as any;
-            expect(dispatchCall.type).toBe('[Canvas] Create Connection');
-            expect(dispatchCall.request.payload.component.selectedRelationships).toEqual(['success']);
+            expect(emitted[0].payload.component.selectedRelationships).toEqual(['success']);
+        });
+
+        it('preserves endpoint, bend, acknowledgment, and load-balance payload fields', async () => {
+            const bends = [
+                { x: 10, y: 20 },
+                { x: 30, y: 40 }
+            ];
+            const source = createMockRemoteProcessGroup('source-group');
+            const destination = createMockRemoteProcessGroup('destination-group');
+            const { component } = await setup({ source, destination, bends });
+            component.loadBalanceChanged('PARTITION_BY_ATTRIBUTE');
+            component.createConnectionForm.patchValue({
+                name: 'Prioritized',
+                loadBalanceStrategy: 'PARTITION_BY_ATTRIBUTE',
+                partitionAttribute: 'tenant',
+                compression: 'COMPRESS_ATTRIBUTES_ONLY',
+                prioritizers: ['org.apache.nifi.prioritizer.FirstInFirstOutPrioritizer']
+            });
+            const emitted: Array<{ payload: unknown }> = [];
+            component.createConnection.subscribe((request) => emitted.push(request));
+
+            component.submitCreateConnection('root');
+
+            expect(emitted[0].payload).toEqual(
+                expect.objectContaining({
+                    disconnectedNodeAcknowledged: false,
+                    component: expect.objectContaining({
+                        name: 'Prioritized',
+                        source: {
+                            groupId: 'source-group',
+                            id: 'output-1',
+                            type: 'REMOTE_OUTPUT_PORT'
+                        },
+                        destination: {
+                            groupId: 'destination-group',
+                            id: 'input-1',
+                            type: 'REMOTE_INPUT_PORT'
+                        },
+                        bends,
+                        loadBalanceStrategy: 'PARTITION_BY_ATTRIBUTE',
+                        loadBalancePartitionAttribute: 'tenant',
+                        loadBalanceCompression: 'COMPRESS_ATTRIBUTES_ONLY',
+                        prioritizers: ['org.apache.nifi.prioritizer.FirstInFirstOutPrioritizer'],
+                        flowFileExpiration: '0 sec',
+                        backPressureObjectThreshold: 10000,
+                        backPressureDataSizeThreshold: '1 GB'
+                    })
+                })
+            );
         });
     });
 

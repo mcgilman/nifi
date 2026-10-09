@@ -18,18 +18,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { GroupComponents } from './group-components.component';
-import { GroupComponentsDialogRequest } from '../../../../../state/flow';
+import { GroupComponentsDialogRequest } from '../../../../state/flow-shared';
 import { ComponentType } from '@nifi/shared';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { provideMockStore } from '@ngrx/store/testing';
-import { initialState } from '../../../../../state/flow/flow.reducer';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { initialState as initialErrorState } from '../../../../../../../state/error/error.reducer';
-import { errorFeatureKey } from '../../../../../../../state/error';
-import { initialState as initialCurrentUserState } from '../../../../../../../state/current-user/current-user.reducer';
-import { currentUserFeatureKey } from '../../../../../../../state/current-user';
-import { canvasFeatureKey } from '../../../../../state';
-import { flowFeatureKey } from '../../../../../state/flow';
+import { initialState as initialErrorState } from '../../../../state/error/error.reducer';
+import { errorFeatureKey } from '../../../../state/error';
 
 describe('GroupComponents', () => {
     let component: GroupComponents;
@@ -874,11 +869,7 @@ describe('GroupComponents', () => {
                 },
                 provideMockStore({
                     initialState: {
-                        [errorFeatureKey]: initialErrorState,
-                        [currentUserFeatureKey]: initialCurrentUserState,
-                        [canvasFeatureKey]: {
-                            [flowFeatureKey]: initialState
-                        }
+                        [errorFeatureKey]: initialErrorState
                     }
                 })
             ]

@@ -228,7 +228,7 @@
                 <button
                     [disabled]="createConnectionForm.invalid || saving.value || createConnectionForm.pending"
                     type="button"
-                    (click)="createConnection(breadcrumbs.id)"
+                    (click)="submitCreateConnection(breadcrumbs.id)"
                     mat-flat-button
                     data-qa="add-button">
                     <span *nifiSpinner="saving.value">Add</span>
